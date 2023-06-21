@@ -32,15 +32,16 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04, windows-12]
+        features: ["--features git,git-reqwest", "--features sparse,sparse-reqwest", null]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo test build
-        run: cargo build --tests --all-features
+        run: cargo build --tests ${{ matrix.features }}
       - name: cargo test
-        run: cargo test --all-features
+        run: cargo test ${{ matrix.features }}
 
   deny-check:
     name: cargo-deny

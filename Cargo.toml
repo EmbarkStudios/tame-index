@@ -6,4 +6,49 @@ rust-version = "1.70.0"
 description = "Provides access to local and remote cargo registry indices"
 license = "Apache-2.0 OR MIT"
 
+[features]
+default = []
+# Enables the built-in support for fetching and reading a git registry index
+git = ["gix"]
+# Enables the use of reqwest with rustls-tsl as the HTTP implementation. Recommended.
+git-reqwest = ["gix?/blocking-http-transport-reqwest-rust-tls"]
+# Enables the use of curl with native tls as the HTTP implementation. Not recommended.
+#git-curl = ["gix?/blocking-http-transport-curl"]
+# Enables the built-in support for requesting index entries from a HTTP sparse registry index
+sparse = ["reqwest"]
+# Enables rustls-tls as the tls implementation for the HTTP client. Recommended.
+sparse-rustls-tls = ["reqwest?/rustls-tls"]
+# Enables native-tls as the tls implementation for the HTTP client. Not recommended.
+#sparse-native-tls = ["reqwest?/native-tls"]
+
 [dependencies]
+# All paths are assumed to be utf-8 for ease of use and implementation
+camino = "1.1"
+# Used to find the location of the local `CARGO_HOME`
+home = "0.5"
+# Allows calling crates to provide their own HTTP implementation
+http = "0.2"
+# Nicer scanning through bytes
+memchr = "2.5"
+semver = { version = "1.0", features = ["serde"] }
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = "1.0"
+smol_str = { version = "0.2.0", features = ["serde"] }
+# Laziness
+thiserror = "1.0"
+twox-hash = "1.6"
+
+[dependencies.gix]
+optional = true
+version = "0.46"
+default-features = false
+features = ["max-performance-safe", "blocking-network-client"]
+
+[dependencies.reqwest]
+optional = true
+version = "0.11"
+default-features = false
+features = ["blocking", "gzip"]
+
+[dev-dependencies]
+tempfile = "3.6"
