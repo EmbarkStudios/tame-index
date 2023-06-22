@@ -8,25 +8,26 @@ use smol_str::SmolStr;
 use std::{collections::HashMap, sync::Arc};
 
 /// A single version of a crate (package) published to the index
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct IndexVersion {
     pub name: SmolStr,
     #[serde(rename = "vers")]
     pub version: Version,
-    deps: Arc<[IndexDependency]>,
-    features: Arc<HashMap<String, Vec<String>>>,
+    pub deps: Arc<[IndexDependency]>,
+    pub features: Arc<HashMap<String, Vec<String>>>,
     /// It's wrapped in `Option<Box>` to reduce size of the struct when the field is unused (i.e. almost always)
     /// <https://rust-lang.github.io/rfcs/3143-cargo-weak-namespaced-features.html#index-changes>
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[allow(clippy::box_collection)]
-    features2: Option<Box<HashMap<String, Vec<String>>>>,
+    pub features2: Option<Box<HashMap<String, Vec<String>>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    links: Option<Box<SmolStr>>,
+    pub links: Option<Box<SmolStr>>,
     #[serde(default)]
-    rust_version: Option<SmolStr>,
-    cksum: Chksum,
+    pub rust_version: Option<SmolStr>,
+    #[serde(rename = "cksum")]
+    pub checksum: Chksum,
     #[serde(default)]
-    yanked: bool,
+    pub yanked: bool,
 }
 
 impl IndexVersion {
@@ -41,7 +42,7 @@ impl IndexVersion {
     /// SHA256 of the .crate file
     #[inline]
     pub fn checksum(&self) -> &[u8; 32] {
-        &self.cksum.0
+        &self.checksum.0
     }
 
     /// Explicit features this crate has. This list is not exhaustive,
@@ -97,15 +98,15 @@ pub struct IndexDependency {
     pub name: SmolStr,
     pub req: semver::VersionReq,
     /// Double indirection to remove size from this struct, since the features are rarely set
-    features: Box<Box<[String]>>,
+    pub features: Box<Box<[String]>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    package: Option<Box<SmolStr>>,
+    pub package: Option<Box<SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    kind: Option<DependencyKind>,
+    pub kind: Option<DependencyKind>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    target: Option<Box<SmolStr>>,
-    optional: bool,
-    default_features: bool,
+    pub target: Option<Box<SmolStr>>,
+    pub optional: bool,
+    pub default_features: bool,
 }
 
 impl IndexDependency {
@@ -184,7 +185,7 @@ pub enum DependencyKind {
 }
 
 /// A whole crate with all its versions
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct IndexKrate {
     /// All versions of the crate, sorted chronologically by when it was published
     pub versions: Vec<IndexVersion>,
@@ -253,7 +254,7 @@ impl IndexKrate {
         Self::from_slice(&lines)
     }
 
-    /// Parse crate file from in-memory JSON-lines data
+    /// Parse a crate from in-memory JSON-lines data
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Result<Self, Error> {
         let mut dedupe = DedupeContext::default();
@@ -261,12 +262,11 @@ impl IndexKrate {
     }
 
     /// Parse a [`Self`] file from in-memory JSON data
-    #[inline(never)]
     pub(crate) fn from_slice_with_context(
         mut bytes: &[u8],
         dedupe: &mut DedupeContext,
     ) -> Result<Self, Error> {
-        use crate::cache::split;
+        use crate::index::cache::split;
         // Trim last newline(s) so we don't need to special case the split
         while bytes.last() == Some(&b'\n') {
             bytes = &bytes[..bytes.len() - 1];
@@ -298,10 +298,46 @@ impl IndexKrate {
 
         Ok(Self { versions })
     }
+
+    /// Writes this crate into a JSON-lines formatted buffer
+    ///
+    /// Note this creates its own internal [`std::io::BufWriter`], there is no
+    /// need to wrap it in your own
+    pub fn to_json_lines<W: std::io::Write>(&self, writer: &mut W) -> Result<(), Error> {
+        use std::io::{BufWriter, Write};
+
+        let mut w = BufWriter::new(writer);
+        for iv in &self.versions {
+            serde_json::to_writer(&mut w, &iv)?;
+            w.write_all(b"\n")?;
+        }
+
+        Ok(w.flush()?)
+    }
 }
 
-#[derive(Debug, Clone)]
-struct Chksum([u8; 32]);
+#[derive(Clone, Eq, PartialEq)]
+pub struct Chksum(pub [u8; 32]);
+
+use std::fmt;
+
+impl fmt::Debug for Chksum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut hex = [0; 64];
+        let hs = crate::utils::encode_hex(&self.0, &mut hex);
+
+        f.debug_struct("Chksum").field("sha-256", &hs).finish()
+    }
+}
+
+impl fmt::Display for Chksum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut hex = [0; 64];
+        let hs = crate::utils::encode_hex(&self.0, &mut hex);
+
+        f.write_str(hs)
+    }
+}
 
 impl<'de> Deserialize<'de> for Chksum {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
