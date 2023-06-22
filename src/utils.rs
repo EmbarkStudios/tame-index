@@ -15,6 +15,7 @@ pub(crate) fn encode_hex<'out, const I: usize, const O: usize>(
     const CHARS: &[u8] = b"0123456789abcdef";
 
     for (i, &byte) in input.iter().enumerate() {
+        let i = i * 2;
         output[i] = CHARS[(byte >> 4) as usize];
         output[i + 1] = CHARS[(byte & 0xf) as usize];
     }
