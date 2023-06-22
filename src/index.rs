@@ -2,7 +2,8 @@ pub mod cache;
 pub mod git;
 #[cfg(feature = "git")]
 pub(crate) mod git_remote;
-pub mod local;
+#[cfg(feature = "combo-index")]
+mod index;
 pub mod sparse;
 #[cfg(feature = "sparse")]
 mod sparse_remote;
@@ -11,7 +12,8 @@ pub use cache::IndexCache;
 pub use git::GitIndex;
 #[cfg(feature = "git")]
 pub use git_remote::RemoteGitIndex;
-pub use local::IndexCache;
+#[cfg(feature = "combo-index")]
+pub use index::Index;
 pub use sparse::SparseIndex;
 #[cfg(feature = "sparse")]
 pub use sparse_remote::{AsyncRemoteSparseIndex, RemoteSparseIndex};

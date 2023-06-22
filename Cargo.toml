@@ -9,17 +9,21 @@ license = "Apache-2.0 OR MIT"
 [features]
 default = []
 # Enables the built-in support for fetching and reading a git registry index
-git = ["gix"]
+git = ["dep:gix"]
 # Enables the use of reqwest with rustls-tsl as the HTTP implementation. Recommended.
 git-reqwest = ["gix?/blocking-http-transport-reqwest-rust-tls"]
 # Enables the use of curl with native tls as the HTTP implementation. Not recommended.
-#git-curl = ["gix?/blocking-http-transport-curl"]
+git-curl = ["gix?/blocking-http-transport-curl"]
 # Enables the built-in support for requesting index entries from a HTTP sparse registry index
-sparse = ["reqwest"]
+sparse = ["dep:reqwest"]
 # Enables rustls-tls as the tls implementation for the HTTP client. Recommended.
 sparse-rustls-tls = ["reqwest?/rustls-tls"]
 # Enables native-tls as the tls implementation for the HTTP client. Not recommended.
-#sparse-native-tls = ["reqwest?/native-tls"]
+sparse-native-tls = ["reqwest?/native-tls"]
+# Enables a convenience `Index` that can be used to access either a remote git or
+# sparse index, with a convenience constructor for crates.io that takes various
+# configuration factors into account
+combo-index = ["git", "sparse", "dep:toml"]
 
 [dependencies]
 # All paths are assumed to be utf-8 for ease of use and implementation
@@ -30,12 +34,18 @@ home = "0.5"
 http = "0.2"
 # Nicer scanning through bytes
 memchr = "2.5"
+# Nicer versions for users
 semver = { version = "1.0", features = ["serde"] }
+# Serialization
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
+# Smaller fixed size strings with heap fallback
 smol_str = { version = "0.2.0", features = ["serde"] }
 # Laziness
 thiserror = "1.0"
+# cargo config parsing
+toml = { version = "0.7", optional = true }
+# Faster hashing
 twox-hash = "1.6"
 
 [dependencies.gix]

@@ -16,6 +16,9 @@ pub enum Error {
     InvalidUrl(#[from] InvalidUrl),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[cfg(feature = "combo-index")]
+    #[error(transparent)]
+    Toml(#[from] toml::de::Error),
     #[error("index entry contained no versions for the crate")]
     NoCrateVersions,
     #[error(transparent)]
