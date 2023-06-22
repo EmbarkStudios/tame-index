@@ -1,3 +1,4 @@
+pub mod cache;
 pub mod git;
 #[cfg(feature = "git")]
 pub(crate) mod git_remote;
@@ -6,6 +7,7 @@ pub mod sparse;
 #[cfg(feature = "sparse")]
 mod sparse_remote;
 
+pub use cache::IndexCache;
 pub use git::GitIndex;
 #[cfg(feature = "git")]
 pub use git_remote::RemoteGitIndex;
