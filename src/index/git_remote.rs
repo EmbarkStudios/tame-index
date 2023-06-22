@@ -10,7 +10,6 @@ pub struct RemoteGitIndex {
     index: GitIndex,
     repo: gix::Repository,
     remote_name: Option<String>,
-    branch_name: &'static str,
 }
 
 impl RemoteGitIndex {
@@ -56,8 +55,13 @@ impl RemoteGitIndex {
             repo,
             index,
             remote_name,
-            branch_name: "master",
         })
+    }
+
+    /// Gets the local index
+    #[inline]
+    pub fn local(&self) -> &GitIndex {
+        &self.index
     }
 
     /// Sets the head commit in the wrapped index so that cache entries can be
@@ -86,7 +90,7 @@ impl RemoteGitIndex {
         // let head = head_ref.peel_to_commit_in_place()?;
 
         let head = repo.head_commit().map_err(GitError::Head)?;
-        let gix::ObjectId::Sha1(sha1) = head.id;
+        let gix::ObjectId::Sha1(sha1) = dbg!(head.id);
         index.set_head_commit(Some(sha1));
 
         Ok(())
@@ -188,42 +192,50 @@ impl RemoteGitIndex {
                     .unwrap_or_else(|| Err(GitError::UnknownRemote))?
             };
 
-            if remote.refspecs(DIR).is_empty() {
-                let spec = format!(
-                    "+refs/heads/{branch}:refs/remotes/{remote}/{branch}",
-                    remote = self.remote_name.as_deref().unwrap_or("origin"),
-                    branch = self.branch_name,
-                );
-                remote
-                    .replace_refspecs(Some(spec.as_str()), DIR)
-                    .expect("valid statically known refspec");
-            }
+            let remote_head = format!(
+                "refs/remotes/{}/HEAD",
+                self.remote_name.as_deref().unwrap_or("origin")
+            );
+
+            remote
+                .replace_refspecs(Some(format!("HEAD:{remote_head}").as_str()), DIR)
+                .expect("valid statically known refspec");
+
+            // Perform the actual fetch
             let res: gix::remote::fetch::Outcome = remote
                 .connect(DIR)?
                 .prepare_fetch(&mut progress, Default::default())?
                 .receive(&mut progress, should_interrupt)?;
-            let branch_name = format!("refs/heads/{}", self.branch_name);
-            let local_tracking = res
-                .ref_map
-                .mappings
-                .iter()
-                .find_map(|m| {
-                    let gix::remote::fetch::Source::Ref(r) = &m.remote else { return None; };
-                    (r.unpack().0 == branch_name)
-                        .then_some(m.local.as_ref())
-                        .flatten()
-                })
-                .ok_or(GitError::MissingLocalBranch {
-                    branch: branch_name,
-                })?;
-            let id = self
+
+            // Get the commit id of the remote's HEAD
+            let remote_head_id = self
                 .repo
-                .find_reference(local_tracking)
-                .expect("local tracking branch exists if we see it here")
-                .id()
+                .find_reference(remote_head.as_str())?
+                .into_fully_peeled_id()?
                 .detach();
 
-            assert_eq!(id, self.repo.head_commit()?.id);
+            use gix::refs::transaction as tx;
+
+            // Update our local HEAD to the remote HEAD
+            self.repo.edit_reference(tx::RefEdit {
+                change: tx::Change::Update {
+                    log: tx::LogChange {
+                        mode: tx::RefLog::AndReference,
+                        force_create_reflog: false,
+                        message: "".into(),
+                    },
+                    expected: tx::PreviousValue::MustExist,
+                    new: gix::refs::Target::Peeled(remote_head_id),
+                },
+                name: "HEAD".try_into().unwrap(),
+                deref: true,
+            })?;
+
+            // let obj = self.repo.find_object(id).unwrap();
+            // assert_eq!(obj.kind, gix::object::Kind::Commit);
+
+            // dbg!(id);
+            assert_eq!(remote_head_id, self.repo.head_commit()?.id);
             Ok(())
         };
 
@@ -248,10 +260,12 @@ pub enum GitError {
     Fetch(#[from] gix::remote::fetch::Error),
     #[error(transparent)]
     Open(#[from] gix::open::Error),
-    #[error("unable to find local tracking branch '{branch}'")]
-    MissingLocalBranch { branch: String },
+    #[error(transparent)]
+    Peel(#[from] gix::reference::peel::Error),
     #[error(transparent)]
     Head(#[from] gix::reference::head_commit::Error),
+    #[error(transparent)]
+    HeadUpdate(#[from] gix::reference::edit::Error),
     #[error(transparent)]
     Commit(#[from] gix::object::commit::Error),
     #[error(transparent)]

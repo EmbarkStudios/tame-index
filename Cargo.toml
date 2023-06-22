@@ -50,7 +50,7 @@ twox-hash = "1.6"
 
 [dependencies.gix]
 optional = true
-version = "0.46"
+version = "0.47"
 default-features = false
 features = ["max-performance-safe", "blocking-network-client"]
 
