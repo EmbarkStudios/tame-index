@@ -103,7 +103,7 @@ impl RemoteGitIndex {
         name: KrateName<'_>,
         write_cache_entry: bool,
     ) -> Result<Option<IndexKrate>, Error> {
-        if let Ok(Some(cached)) = self.index.cached_krate(name) {
+        if let Ok(Some(cached)) = self.cached_krate(name) {
             return Ok(Some(cached));
         }
 
@@ -137,11 +137,18 @@ impl RemoteGitIndex {
         Ok(Some(krate))
     }
 
+    /// Attempts to read the locally cached crate information
+    #[inline]
+    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
+        self.index.cached_krate(name)
+    }
+
     /// Performs a fetch from the remote index repository.
     ///
     /// This method performs network I/O.
     ///
     /// If there is a new remote HEAD, this will invalidate all local cache entries
+    #[inline]
     pub fn fetch(&mut self) -> Result<(), Error> {
         self.fetch_with_options(gix::progress::Discard, &AtomicBool::default())
     }

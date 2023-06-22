@@ -52,6 +52,16 @@ impl RemoteSparseIndex {
         self.index
             .parse_remote_response(name, res, write_cache_entry)
     }
+
+    /// Attempts to read the locally cached crate information
+    ///
+    /// This method does no network I/O unlike [`Self::krate`], but does not
+    /// guarantee that the cache information is up to date with the latest in
+    /// the remote index
+    #[inline]
+    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
+        self.index.cached_krate(name, None)
+    }
 }
 
 pub struct AsyncRemoteSparseIndex {
@@ -98,6 +108,16 @@ impl AsyncRemoteSparseIndex {
 
         self.index
             .parse_remote_response(name, res, write_cache_entry)
+    }
+
+    /// Attempts to read the locally cached crate information
+    ///
+    /// This method does no network I/O unlike [`Self::krate_async`], but does not
+    /// guarantee that the cache information is up to date with the latest in
+    /// the remote index
+    #[inline]
+    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
+        self.index.cached_krate(name, None)
     }
 }
 
