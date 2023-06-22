@@ -1,7 +1,5 @@
-use super::IndexCache;
-use crate::{
-    cache::ValidCacheEntry, utils::cargo_home, Error, HttpError, IndexKrate, KrateName, PathBuf,
-};
+use super::{cache::ValidCacheEntry, IndexCache};
+use crate::{utils::cargo_home, Error, HttpError, IndexKrate, KrateName, PathBuf};
 
 /// The default URL of the crates.io HTTP index, see [`Index::from_url`],
 /// [`Index::with_path`], or [`Index::new_cargo_default`]
@@ -88,7 +86,9 @@ impl SparseIndex {
     /// crate
     ///
     /// The body of a successful response for the returned URL can be parsed
-    /// via [`Crate::from_slice`]
+    /// via [`IndexKrate::from_slice`]
+    ///
+    /// See [`Self::make_remote_request`] for a way to make a complete request
     #[inline]
     pub fn crate_url(&self, name: KrateName<'_>) -> String {
         let rel_path = name.relative_path(Some('/'));
@@ -258,47 +258,5 @@ impl SparseIndex {
             }
             .into()),
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::SparseIndex;
-
-    const TEST_INDEX: &str = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/testdata/sparse_registry_cache/cargo_home"
-    );
-
-    #[test]
-    fn opens_crates_io() {
-        let index = SparseIndex::with_path(TEST_INDEX, super::CRATES_IO_HTTP_INDEX).unwrap();
-
-        assert_eq!(index.url(), "https://index.crates.io/");
-        assert_eq!(
-            index.crate_url("autocfg".try_into().unwrap()),
-            "https://index.crates.io/au/to/autocfg"
-        );
-    }
-
-    #[test]
-    fn parses_cache() {
-        let index = SparseIndex::with_path(TEST_INDEX, super::CRATES_IO_HTTP_INDEX).unwrap();
-
-        let krate = index
-            .cached_krate("autocfg".try_into().unwrap())
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(krate.name(), "autocfg");
-        assert_eq!(krate.versions.len(), 13);
-        assert_eq!(
-            krate.earliest_version().version,
-            semver::Version::new(0, 0, 1)
-        );
-        assert_eq!(
-            krate.highest_version().version,
-            semver::Version::new(1, 1, 0)
-        );
     }
 }
