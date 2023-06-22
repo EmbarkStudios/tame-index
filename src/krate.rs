@@ -303,7 +303,7 @@ impl IndexKrate {
     ///
     /// Note this creates its own internal [`std::io::BufWriter`], there is no
     /// need to wrap it in your own
-    pub fn to_json_lines<W: std::io::Write>(&self, writer: &mut W) -> Result<(), Error> {
+    pub fn write_json_lines<W: std::io::Write>(&self, writer: &mut W) -> Result<(), Error> {
         use std::io::{BufWriter, Write};
 
         let mut w = BufWriter::new(writer);

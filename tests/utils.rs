@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
 use std::sync::Arc;
-pub use tame_index::{IndexKrate, PathBuf};
+pub use tame_index::{IndexKrate, Path, PathBuf};
 
 pub struct TempDir {
-    td: tempfile::TempDir,
+    pub td: tempfile::TempDir,
 }
 
 impl TempDir {
@@ -14,12 +14,29 @@ impl TempDir {
             td: tempfile::TempDir::new_in(env!("CARGO_TARGET_TMPDIR")).unwrap(),
         }
     }
+
+    #[inline]
+    pub fn path(&self) -> &Path {
+        Path::from_path(self.td.path()).unwrap()
+    }
+}
+
+impl AsRef<std::path::Path> for TempDir {
+    #[inline]
+    fn as_ref(&self) -> &std::path::Path {
+        self.td.path()
+    }
 }
 
 impl<'td> Into<PathBuf> for &'td TempDir {
     fn into(self) -> PathBuf {
-        PathBuf::from_path_buf(self.td.path().to_owned()).unwrap()
+        self.path().to_owned()
     }
+}
+
+#[inline]
+pub fn tempdir() -> TempDir {
+    TempDir::new()
 }
 
 pub fn fake_krate(name: &str, num_versions: u8) -> IndexKrate {

@@ -45,7 +45,7 @@ const DATE: &str = "Thu, 22 Oct 2023 09:40:03 GMT";
 /// Validates appropriate headers are set when a cache entry does exist
 #[test]
 fn make_request_with_cache() {
-    let td = utils::TempDir::new();
+    let td = utils::tempdir();
 
     let index = SparseIndex::with_path(&td, tame_index::CRATES_IO_HTTP_INDEX).unwrap();
 
@@ -84,7 +84,7 @@ fn make_request_with_cache() {
 /// Validates we can parse a response where the local cache version is up to date
 #[test]
 fn parse_unmodified_response() {
-    let td = utils::TempDir::new();
+    let td = utils::tempdir();
 
     let index = SparseIndex::with_path(&td, tame_index::CRATES_IO_HTTP_INDEX).unwrap();
 
@@ -111,14 +111,14 @@ fn parse_unmodified_response() {
 /// Validates we can parse a modified response
 #[test]
 fn parse_modified_response() {
-    let td = utils::TempDir::new();
+    let td = utils::tempdir();
 
     let index = SparseIndex::with_path(&td, tame_index::CRATES_IO_HTTP_INDEX).unwrap();
 
     {
         let etag_krate = utils::fake_krate("etag-krate", 3);
         let mut serialized = Vec::new();
-        etag_krate.to_json_lines(&mut serialized).unwrap();
+        etag_krate.write_json_lines(&mut serialized).unwrap();
 
         let response = http::Response::builder()
             .status(http::StatusCode::OK)
@@ -148,7 +148,7 @@ fn parse_modified_response() {
     {
         let modified_krate = utils::fake_krate("modified-krate", 3);
         let mut serialized = Vec::new();
-        modified_krate.to_json_lines(&mut serialized).unwrap();
+        modified_krate.write_json_lines(&mut serialized).unwrap();
 
         let response = http::Response::builder()
             .status(http::StatusCode::OK)

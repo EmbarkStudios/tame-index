@@ -68,7 +68,7 @@ impl<'name> KrateName<'name> {
     /// let crate_name: tame_index::KrateName = "tame-index".try_into().unwrap();
     /// assert_eq!(crate_name.relative_path(Some('/')), "ta/me/tame-index");
     /// ```
-    fn relative_path(&self, sep: Option<char>) -> String {
+    pub fn relative_path(&self, sep: Option<char>) -> String {
         let name = self.0;
         // Preallocate with the maximum possible width of a crate prefix `aa/bb/`
         let mut rel_path = String::with_capacity(name.len() + 6);
