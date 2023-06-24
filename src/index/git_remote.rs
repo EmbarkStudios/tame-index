@@ -68,9 +68,12 @@ impl RemoteGitIndex {
     /// properly filtered
     #[inline]
     fn set_head(index: &mut GitIndex, repo: &gix::Repository) -> Result<(), Error> {
-        let head = repo.head_commit().map_err(GitError::Head)?;
-        let gix::ObjectId::Sha1(sha1) = dbg!(head.id);
-        index.set_head_commit(Some(sha1));
+        let head = repo.head_commit().ok().map(|head| {
+            let gix::ObjectId::Sha1(sha1) = head.id;
+            sha1
+        });
+
+        index.set_head_commit(head);
 
         Ok(())
     }
@@ -203,22 +206,51 @@ impl RemoteGitIndex {
                 (full_ref_name == "HEAD").then_some(*object)
             }).ok_or(GitError::UnableToFindRemoteHead)?;
 
-            use gix::refs::transaction as tx;
+            use gix::refs::{transaction as tx, Target};
 
-            // Update our local HEAD to the remote HEAD
-            self.repo.edit_reference(tx::RefEdit {
-                change: tx::Change::Update {
-                    log: tx::LogChange {
-                        mode: tx::RefLog::AndReference,
-                        force_create_reflog: false,
-                        message: "".into(),
+            // In all (hopefully?) cases HEAD is a symbolic reference to
+            // refs/heads/<branch> which is a peeled commit id, if that's the case
+            // we update it to the new commit id, otherwise we just set HEAD
+            // directly
+            use gix::head::Kind;
+            let edit = match self.repo.head()?.kind {
+                Kind::Symbolic(sref) => {
+                    // Update our local HEAD to the remote HEAD
+                    if let Target::Symbolic(name) = sref.target {
+                        Some(tx::RefEdit {
+                            change: tx::Change::Update {
+                                log: tx::LogChange {
+                                    mode: tx::RefLog::AndReference,
+                                    force_create_reflog: false,
+                                    message: "".into(),
+                                },
+                                expected: tx::PreviousValue::MustExist,
+                                new: gix::refs::Target::Peeled(remote_head_id),
+                            },
+                            name,
+                            deref: true,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                Kind::Unborn(_) | Kind::Detached { .. } => None,
+            };
+
+            self.repo
+                .edit_reference(edit.unwrap_or_else(|| tx::RefEdit {
+                    change: tx::Change::Update {
+                        log: tx::LogChange {
+                            mode: tx::RefLog::AndReference,
+                            force_create_reflog: false,
+                            message: "".into(),
+                        },
+                        expected: tx::PreviousValue::Any,
+                        new: gix::refs::Target::Peeled(remote_head_id),
                     },
-                    expected: tx::PreviousValue::MustExist,
-                    new: gix::refs::Target::Peeled(remote_head_id),
-                },
-                name: "refs/heads/main".try_into().unwrap(),
-                deref: true,
-            })?;
+                    name: "HEAD".try_into().unwrap(),
+                    deref: true,
+                }))?;
 
             // Sanity check that the local HEAD points to the same commit
             // as the remote HEAD

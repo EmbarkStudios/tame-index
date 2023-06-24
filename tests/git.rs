@@ -305,3 +305,109 @@ fn fetch_invalidates_cache() {
         .unwrap()
         .is_none());
 }
+
+/// gix uses a default branch name of `main`, but most cargo git indexes on users
+/// disks use the master branch, so just ensure that we support that as well
+#[test]
+fn non_main_local_branch() {
+    let mut remote = FakeRemote::new();
+
+    let local_td = utils::tempdir();
+
+    // Set up the local repo as if it was an already existing index
+    // created by cargo
+    {
+        // Do that actual init
+        let mut cmd = std::process::Command::new("git");
+        cmd.args(["init", "--bare", "-b", "master"]);
+        cmd.arg(local_td.path());
+        assert!(
+            cmd.status().expect("failed to run git").success(),
+            "git failed to init directory"
+        );
+
+        // Add the remote, we expect the remote to already be set if the repo exists
+        let mut cmd = std::process::Command::new("git");
+        cmd.arg("-C");
+        cmd.arg(local_td.path());
+        cmd.args(["remote", "add", "origin"]);
+        cmd.arg(remote.td.path());
+        assert!(
+            cmd.status().expect("failed to run git").success(),
+            "git failed to add remote"
+        );
+
+        // Add a fake commit so that we have a local HEAD
+        let mut repo = gix::open(local_td.path()).unwrap();
+
+        let commit = {
+            let snap = FakeRemote::snapshot(&mut repo);
+            let empty_tree_id = snap
+                .write_object(&gix::objs::Tree::empty())
+                .unwrap()
+                .detach();
+
+            snap.commit(
+                "refs/heads/master",
+                "initial commit",
+                empty_tree_id,
+                gix::commit::NO_PARENT_IDS,
+            )
+            .unwrap()
+            .detach()
+        };
+
+        use gix::refs::transaction as tx;
+        repo.edit_reference(tx::RefEdit {
+            change: tx::Change::Update {
+                log: tx::LogChange {
+                    mode: tx::RefLog::AndReference,
+                    force_create_reflog: false,
+                    message: "".into(),
+                },
+                expected: tx::PreviousValue::Any,
+                new: gix::refs::Target::Peeled(commit),
+            },
+            name: "refs/heads/master".try_into().unwrap(),
+            deref: false,
+        })
+        .unwrap();
+
+        repo.edit_reference(tx::RefEdit {
+            change: tx::Change::Update {
+                log: tx::LogChange {
+                    mode: tx::RefLog::AndReference,
+                    force_create_reflog: false,
+                    message: "".into(),
+                },
+                expected: tx::PreviousValue::Any,
+                new: gix::refs::Target::Symbolic("refs/heads/master".try_into().unwrap()),
+            },
+            name: "HEAD".try_into().unwrap(),
+            deref: false,
+        })
+        .unwrap();
+
+        assert_eq!(commit, repo.head_commit().unwrap().id);
+    }
+
+    let mut rgi = RemoteGitIndex::new(GitIndex::at_path(
+        local_td.path().to_owned(),
+        remote.td.path().as_str().to_owned(),
+    ))
+    .unwrap();
+
+    dbg!(local_td.td.into_path());
+
+    let first = utils::fake_krate("first", 1);
+    remote.commit(&first);
+
+    rgi.fetch().unwrap();
+
+    assert_eq!(
+        rgi.krate("first".try_into().unwrap(), true)
+            .unwrap()
+            .unwrap(),
+        first
+    );
+}
