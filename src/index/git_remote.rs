@@ -68,27 +68,6 @@ impl RemoteGitIndex {
     /// properly filtered
     #[inline]
     fn set_head(index: &mut GitIndex, repo: &gix::Repository) -> Result<(), Error> {
-        // let head_ref = repo
-        //     .find_reference("FETCH_HEAD")
-        //     .or_else(|_e| repo.find_referenc("HEAD"))?;
-
-        // let mut head_ref = match head_ref.inner.target {
-        //     gix::gix_ref::TargetRef::Symbolic(branch) => match repo.find_reference(&branch) {
-        //         Ok(r) => gix::head::Kind::Symbolic(r.detach()),
-        //         Err(gix::reference::find::existing::Error::NotFound) => {
-        //             gix::head::Kind::Unborn(branch)
-        //         }
-        //         Err(err) => return Err(err.into()),
-        //     },
-        //     gix::gix_ref::TargetRef::Peeled(target) => gix::head::Kind::Detached {
-        //         target,
-        //         peeled: head.inner.peeled,
-        //     },
-        // }
-        // .attach(repo);
-
-        // let head = head_ref.peel_to_commit_in_place()?;
-
         let head = repo.head_commit().map_err(GitError::Head)?;
         let gix::ObjectId::Sha1(sha1) = dbg!(head.id);
         index.set_head_commit(Some(sha1));
@@ -202,17 +181,27 @@ impl RemoteGitIndex {
                 .expect("valid statically known refspec");
 
             // Perform the actual fetch
-            let res: gix::remote::fetch::Outcome = remote
+            let fetch_response: gix::remote::fetch::Outcome = remote
                 .connect(DIR)?
                 .prepare_fetch(&mut progress, Default::default())?
                 .receive(&mut progress, should_interrupt)?;
 
-            // Get the commit id of the remote's HEAD
-            let remote_head_id = self
-                .repo
-                .find_reference(remote_head.as_str())?
-                .into_fully_peeled_id()?
-                .detach();
+            // Find the commit id of the remote's HEAD
+            let remote_head_id = fetch_response.ref_map.mappings.iter().find_map(|mapping| {
+                let gix::remote::fetch::Source::Ref(rref) = &mapping.remote else { return None; };
+
+                if mapping.local.as_deref()? != remote_head.as_bytes() {
+                    return None;
+                }
+
+                let gix::protocol::handshake::Ref::Symbolic {
+                    full_ref_name,
+                    object,
+                    ..
+                } = rref else { return None; };
+
+                (full_ref_name == "HEAD").then(|| object.clone())
+            }).ok_or(GitError::UnableToFindRemoteHead)?;
 
             use gix::refs::transaction as tx;
 
@@ -227,16 +216,17 @@ impl RemoteGitIndex {
                     expected: tx::PreviousValue::MustExist,
                     new: gix::refs::Target::Peeled(remote_head_id),
                 },
-                name: "HEAD".try_into().unwrap(),
+                name: "refs/heads/main".try_into().unwrap(),
                 deref: true,
             })?;
 
-            // let obj = self.repo.find_object(id).unwrap();
-            // assert_eq!(obj.kind, gix::object::Kind::Commit);
-
-            // dbg!(id);
-            assert_eq!(remote_head_id, self.repo.head_commit()?.id);
-            Ok(())
+            // Sanity check that the local HEAD points to the same commit
+            // as the remote HEAD
+            if remote_head_id != self.repo.head_commit()?.id {
+                Err(GitError::UnableToUpdateHead)
+            } else {
+                Ok(())
+            }
         };
 
         perform_fetch()?;
@@ -276,4 +266,8 @@ pub enum GitError {
     RemoteLookup(#[from] gix::remote::find::existing::Error),
     #[error("unable to determine a suitable remote")]
     UnknownRemote,
+    #[error("unable to locate remote HEAD")]
+    UnableToFindRemoteHead,
+    #[error("unable to update HEAD to remote HEAD")]
+    UnableToUpdateHead,
 }

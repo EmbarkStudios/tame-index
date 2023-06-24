@@ -256,9 +256,6 @@ fn fetch_invalidates_cache() {
     // Perform fetch, which should invalidate the cache
     rgi.fetch().unwrap();
 
-    println!("local {:?}", _td.td.into_path());
-    println!("remote {:?}", remote.td.td.into_path());
-
     assert_eq!(
         rgi.local().head_commit().unwrap(),
         new_head.to_hex().to_string()
@@ -276,4 +273,35 @@ fn fetch_invalidates_cache() {
             .expect("expected krate"),
         new_krate,
     );
+
+    // We haven't made new commits, so the fetch should not move HEAD and thus
+    // cache entries should still be valid
+    rgi.fetch().unwrap();
+
+    assert_eq!(
+        rgi.local()
+            .cached_krate("invalidates-cache".try_into().unwrap())
+            .unwrap()
+            .unwrap(),
+        new_krate
+    );
+
+    let krate3 = utils::fake_krate("krate-3", 3);
+    remote.commit(&krate3);
+
+    let krate4 = utils::fake_krate("krate-4", 4);
+    let expected_head = remote.commit(&krate4);
+
+    rgi.fetch().unwrap();
+
+    assert_eq!(
+        rgi.local().head_commit().unwrap(),
+        expected_head.to_hex().to_string()
+    );
+
+    assert!(rgi
+        .local()
+        .cached_krate("invalidates-cache".try_into().unwrap())
+        .unwrap()
+        .is_none());
 }
