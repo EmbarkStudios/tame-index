@@ -9,15 +9,17 @@ pub struct TempDir {
 
 impl TempDir {
     #[inline]
-    pub fn new() -> Self {
+    pub fn path(&self) -> &Path {
+        Path::from_path(self.td.path()).unwrap()
+    }
+}
+
+impl Default for TempDir {
+    #[inline]
+    fn default() -> Self {
         Self {
             td: tempfile::TempDir::new_in(env!("CARGO_TARGET_TMPDIR")).unwrap(),
         }
-    }
-
-    #[inline]
-    pub fn path(&self) -> &Path {
-        Path::from_path(self.td.path()).unwrap()
     }
 }
 
@@ -28,15 +30,15 @@ impl AsRef<std::path::Path> for TempDir {
     }
 }
 
-impl<'td> Into<PathBuf> for &'td TempDir {
-    fn into(self) -> PathBuf {
-        self.path().to_owned()
+impl<'td> From<&'td TempDir> for PathBuf {
+    fn from(td: &'td TempDir) -> Self {
+        td.path().to_owned()
     }
 }
 
 #[inline]
 pub fn tempdir() -> TempDir {
-    TempDir::new()
+    TempDir::default()
 }
 
 pub fn fake_krate(name: &str, num_versions: u8) -> IndexKrate {

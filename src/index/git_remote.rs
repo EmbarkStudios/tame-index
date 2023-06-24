@@ -200,7 +200,7 @@ impl RemoteGitIndex {
                     ..
                 } = rref else { return None; };
 
-                (full_ref_name == "HEAD").then(|| object.clone())
+                (full_ref_name == "HEAD").then_some(*object)
             }).ok_or(GitError::UnableToFindRemoteHead)?;
 
             use gix::refs::transaction as tx;
