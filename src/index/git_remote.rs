@@ -15,6 +15,9 @@ pub struct RemoteGitIndex {
 impl RemoteGitIndex {
     /// Creates a new [`Self`] that can access and write local cache entries,
     /// and contact the remote index to retrieve the latest index information
+    ///
+    /// Note that if a repository does not exist at the local disk path of the
+    /// provided [`GitIndex`], a full clone will be performed.
     #[inline]
     pub fn new(index: GitIndex) -> Result<Self, Error> {
         Self::with_options(index, gix::progress::Discard, &AtomicBool::default())

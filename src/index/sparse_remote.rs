@@ -60,7 +60,7 @@ impl RemoteSparseIndex {
     /// the remote index
     #[inline]
     pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
-        self.index.cached_krate(name, None)
+        self.index.cached_krate(name)
     }
 }
 
@@ -117,7 +117,7 @@ impl AsyncRemoteSparseIndex {
     /// the remote index
     #[inline]
     pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
-        self.index.cached_krate(name, None)
+        self.index.cached_krate(name)
     }
 }
 

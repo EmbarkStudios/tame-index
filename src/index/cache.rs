@@ -270,15 +270,14 @@ impl IndexCache {
     /// Attempts to read the cache entry for the specified crate
     ///
     /// It is recommended to use [`Self::cached_krate`]
+    #[inline]
     pub fn read_cache_file(&self, name: KrateName<'_>) -> Result<Option<Vec<u8>>, Error> {
         let cache_path = self.cache_path(name);
 
-        let cache_bytes = match std::fs::read(&cache_path) {
-            Ok(cb) => cb,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(err) => return Err(Error::IoPath(err, cache_path)),
-        };
-
-        Ok(Some(cache_bytes))
+        match std::fs::read(&cache_path) {
+            Ok(cb) => Ok(Some(cb)),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(err) => Err(Error::IoPath(err, cache_path)),
+        }
     }
 }

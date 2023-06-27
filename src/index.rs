@@ -19,7 +19,7 @@ pub use sparse::SparseIndex;
 pub use sparse_remote::{AsyncRemoteSparseIndex, RemoteSparseIndex};
 
 /// Global configuration of an index, reflecting the [contents of config.json](https://doc.rust-lang.org/cargo/reference/registries.html#index-format).
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct IndexConfig {
     /// Pattern for creating download URLs. See [`Self::download_url`].
     pub dl: String,
