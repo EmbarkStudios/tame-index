@@ -23,7 +23,7 @@ pub struct IndexVersion {
     /// <https://rust-lang.github.io/rfcs/3143-cargo-weak-namespaced-features.html#index-changes>
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[allow(clippy::box_collection)]
-    features2: Option<Box<FeatureMap>>,
+    pub features2: Option<Box<FeatureMap>>,
     #[serde(default)]
     pub yanked: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
