@@ -81,3 +81,19 @@ impl<'name> KrateName<'name> {
         rel_path
     }
 }
+
+use std::fmt;
+
+impl<'k> fmt::Display for KrateName<'k> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+impl<'k> fmt::Debug for KrateName<'k> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0)
+    }
+}
