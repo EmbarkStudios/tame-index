@@ -46,7 +46,7 @@ fn parses_current_cargo_cache() {
     );
 }
 
-/// Validates we can write cache files the exact same (semantically) as the current version of cargo
+/// Validates we can write cache files the exact same as the current version of cargo
 #[test]
 fn serializes_current_cargo_cache() {
     let (path, _url) = get_index_details(tame_index::CRATES_IO_HTTP_INDEX, None).unwrap();
@@ -70,8 +70,5 @@ fn serializes_current_cargo_cache() {
     let our_ce = ValidCacheEntry::read(&ours).expect("failed to parse our cache file");
 
     assert_eq!(cargo_ce.revision, our_ce.revision);
-
-    let ours_krate = our_ce.to_krate(None).unwrap().unwrap();
-
-    assert_eq!(cargos_krate, ours_krate);
+    assert_eq!(cargo_ce.version_entries, our_ce.version_entries);
 }

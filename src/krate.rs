@@ -5,7 +5,9 @@ use dedupe::DedupeContext;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
+
+pub type FeatureMap = BTreeMap<String, Vec<String>>;
 
 /// A single version of a crate (package) published to the index
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -14,20 +16,20 @@ pub struct IndexVersion {
     #[serde(rename = "vers")]
     pub version: Version,
     pub deps: Arc<[IndexDependency]>,
-    pub features: Arc<HashMap<String, Vec<String>>>,
+    #[serde(rename = "cksum")]
+    pub checksum: Chksum,
+    pub features: Arc<FeatureMap>,
     /// It's wrapped in `Option<Box>` to reduce size of the struct when the field is unused (i.e. almost always)
     /// <https://rust-lang.github.io/rfcs/3143-cargo-weak-namespaced-features.html#index-changes>
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[allow(clippy::box_collection)]
-    pub features2: Option<Box<HashMap<String, Vec<String>>>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub links: Option<Box<SmolStr>>,
-    #[serde(default)]
-    pub rust_version: Option<SmolStr>,
-    #[serde(rename = "cksum")]
-    pub checksum: Chksum,
+    features2: Option<Box<FeatureMap>>,
     #[serde(default)]
     pub yanked: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub links: Option<Box<SmolStr>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rust_version: Option<SmolStr>,
 }
 
 impl IndexVersion {
@@ -50,7 +52,7 @@ impl IndexVersion {
     ///
     /// `default` is a special feature name for implicitly enabled features.
     #[inline]
-    pub fn features(&self) -> &HashMap<String, Vec<String>> {
+    pub fn features(&self) -> &FeatureMap {
         &self.features
     }
 
@@ -96,20 +98,24 @@ impl IndexVersion {
 pub struct IndexDependency {
     /// Dependency's arbitrary nickname (it may be an alias). Use [`Self::crate_name`] for actual crate name.
     pub name: SmolStr,
-    pub req: semver::VersionReq,
+    pub req: SmolStr,
     /// Double indirection to remove size from this struct, since the features are rarely set
     pub features: Box<Box<[String]>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub package: Option<Box<SmolStr>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<DependencyKind>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub target: Option<Box<SmolStr>>,
     pub optional: bool,
     pub default_features: bool,
+    pub target: Option<Box<SmolStr>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<DependencyKind>,
 }
 
 impl IndexDependency {
+    #[inline]
+    pub fn version_requirement(&self) -> semver::VersionReq {
+        self.req.parse().unwrap()
+    }
+
     /// Features unconditionally enabled when using this dependency,
     /// in addition to [`Dependency::has_default_features`] and features enabled
     /// through the parent crate's feature list.

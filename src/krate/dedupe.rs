@@ -6,23 +6,23 @@
 
 use crate::krate::IndexDependency;
 use std::{
-    collections::HashMap,
     hash::{BuildHasherDefault, Hash, Hasher},
     sync::Arc,
 };
 
 type XxSet<K> = std::collections::HashSet<K, BuildHasherDefault<twox_hash::XxHash64>>;
+use super::FeatureMap;
 
 /// Many crate versions have the same features and dependencies
 #[derive(Default)]
 pub(crate) struct DedupeContext {
-    features: XxSet<HashableHashMap<String, Vec<String>>>,
+    features: XxSet<HashedFeatureMap>,
     deps: XxSet<Arc<[IndexDependency]>>,
 }
 
 impl DedupeContext {
-    pub(crate) fn features(&mut self, features: &mut Arc<HashMap<String, Vec<String>>>) {
-        let features_to_dedupe = HashableHashMap::new(Arc::clone(features));
+    pub(crate) fn features(&mut self, features: &mut Arc<FeatureMap>) {
+        let features_to_dedupe = HashedFeatureMap::new(Arc::clone(features));
         if let Some(has_feats) = self.features.get(&features_to_dedupe) {
             *features = Arc::clone(&has_feats.map);
         } else {
@@ -49,12 +49,13 @@ impl DedupeContext {
 
 /// Newtype that caches hash of the hashmap (the default hashmap has a random order of the keys, so it's not cheap to hash)
 #[derive(PartialEq, Eq)]
-pub struct HashableHashMap<K: PartialEq + Hash + Eq, V: PartialEq + Hash + Eq> {
-    pub map: Arc<HashMap<K, V>>,
+pub struct HashedFeatureMap {
+    pub map: Arc<FeatureMap>,
     hash: u64,
 }
 
-impl<K: PartialEq + Hash + Eq, V: PartialEq + Hash + Eq> Hash for HashableHashMap<K, V> {
+impl Hash for HashedFeatureMap {
+    #[inline]
     fn hash<H>(&self, hasher: &mut H)
     where
         H: Hasher,
@@ -63,8 +64,9 @@ impl<K: PartialEq + Hash + Eq, V: PartialEq + Hash + Eq> Hash for HashableHashMa
     }
 }
 
-impl<K: PartialEq + Hash + Eq, V: PartialEq + Hash + Eq> HashableHashMap<K, V> {
-    pub(crate) fn new(map: Arc<HashMap<K, V>>) -> Self {
+impl HashedFeatureMap {
+    #[inline]
+    pub(crate) fn new(map: Arc<FeatureMap>) -> Self {
         let mut hash = 0;
         for (k, v) in map.iter() {
             let mut hasher = twox_hash::XxHash64::default();
