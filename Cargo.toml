@@ -46,7 +46,7 @@ thiserror = "1.0"
 # cargo config parsing
 toml = { version = "0.7", optional = true }
 # Faster hashing
-twox-hash = "1.6"
+twox-hash = { version = "1.6", default-features = false }
 
 [dependencies.gix]
 optional = true
