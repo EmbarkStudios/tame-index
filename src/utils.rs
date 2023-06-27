@@ -21,7 +21,10 @@ pub(crate) fn encode_hex<'out, const I: usize, const O: usize>(
     }
 
     // SAFETY: we only emit ASCII hex characters
-    unsafe { std::str::from_utf8_unchecked(output) }
+    #[allow(unsafe_code)]
+    unsafe {
+        std::str::from_utf8_unchecked(output)
+    }
 }
 
 /// Converts a full index url into a relative path and its canonical form

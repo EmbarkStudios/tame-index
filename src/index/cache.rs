@@ -57,7 +57,7 @@ impl<'buffer> ValidCacheEntry<'buffer> {
         match cache_version.cmp(&CURRENT_CACHE_VERSION) {
             std::cmp::Ordering::Less => return Err(CacheError::OutdatedCacheVersion),
             std::cmp::Ordering::Greater => return Err(CacheError::UnknownCacheVersion),
-            _ => {}
+            std::cmp::Ordering::Equal => {}
         }
 
         buffer = &buffer[1..];

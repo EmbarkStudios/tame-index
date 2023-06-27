@@ -77,7 +77,10 @@ impl GitIndex {
     pub fn head_commit(&self) -> Option<&str> {
         self.head.as_ref().map(|hc| {
             // SAFETY: the buffer is always ASCII hex
-            unsafe { std::str::from_utf8_unchecked(hc) }
+            #[allow(unsafe_code)]
+            unsafe {
+                std::str::from_utf8_unchecked(hc)
+            }
         })
     }
 

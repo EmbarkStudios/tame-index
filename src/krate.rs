@@ -350,7 +350,7 @@ impl<'de> Deserialize<'de> for Chksum {
         impl<'de> serde::de::Visitor<'de> for HexStrVisitor {
             type Value = Chksum;
 
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "a hex encoded string")
             }
 
