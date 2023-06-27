@@ -35,6 +35,53 @@ pub struct UrlDir {
     pub canonical: String,
 }
 
+/// Canonicalizes a `git+` url the same as cargo
+pub fn canonicalize_url(url: &str) -> Result<String, Error> {
+    let url = url.strip_prefix("git+").unwrap_or(url);
+
+    let scheme_ind = url.find("://").map(|i| i + 3).ok_or_else(|| InvalidUrl {
+        url: url.to_owned(),
+        source: InvalidUrlError::MissingScheme,
+    })?;
+
+    // Could use the Url crate for this, but it's simple enough and we don't
+    // need to deal with every possible url (I hope...)
+    let host = match url[scheme_ind..].find('/') {
+        Some(end) => &url[scheme_ind..scheme_ind + end],
+        None => &url[scheme_ind..],
+    };
+
+    // trim port
+    let host = host.split(':').next().unwrap();
+
+    // cargo special cases github.com for reasons, so do the same
+    let mut canonical = if host == "github.com" {
+        url.to_lowercase()
+    } else {
+        url.to_owned()
+    };
+
+    // Chop off any query params/fragments
+    if let Some(hash) = canonical.rfind('#') {
+        canonical.truncate(hash);
+    }
+
+    if let Some(query) = canonical.rfind('?') {
+        canonical.truncate(query);
+    }
+
+    if canonical.ends_with('/') {
+        canonical.pop();
+    }
+
+    if canonical.contains("github.com/") && canonical.ends_with(".git") {
+        // Only GitHub (crates.io) repositories have their .git suffix truncated
+        canonical.truncate(canonical.len() - 4);
+    }
+
+    Ok(canonical)
+}
+
 /// Converts a url into a relative path and its canonical form
 ///
 /// Cargo uses a small algorithm to create unique directory names for any url
@@ -86,41 +133,8 @@ pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
         (url, scheme_ind + 3, kind)
     };
 
-    // Could use the Url crate for this, but it's simple enough and we don't
-    // need to deal with every possible url (I hope...)
-    let host = match url[scheme_ind..].find('/') {
-        Some(end) => &url[scheme_ind..scheme_ind + end],
-        None => &url[scheme_ind..],
-    };
-
-    // trim port
-    let host = host.split(':').next().unwrap();
-
     let (dir_name, url) = if kind == GIT_REPO {
-        // cargo special cases github.com for reasons, so do the same
-        let mut canonical = if host == "github.com" {
-            url.to_lowercase()
-        } else {
-            url.to_owned()
-        };
-
-        // Chop off any query params/fragments
-        if let Some(hash) = canonical.rfind('#') {
-            canonical.truncate(hash);
-        }
-
-        if let Some(query) = canonical.rfind('?') {
-            canonical.truncate(query);
-        }
-
-        if canonical.ends_with('/') {
-            canonical.pop();
-        }
-
-        if canonical.contains("github.com/") && canonical.ends_with(".git") {
-            // Only GitHub (crates.io) repositories have their .git suffix truncated
-            canonical.truncate(canonical.len() - 4);
-        }
+        let canonical = canonicalize_url(url)?;
 
         // For git repo sources, the ident is made up of the last path component
         // which for most git hosting providers is the name of the repo itself
@@ -155,6 +169,16 @@ pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
         };
         let mut raw_ident = [0u8; 16];
         let ident = encode_hex(&hash.to_le_bytes(), &mut raw_ident);
+
+        // Could use the Url crate for this, but it's simple enough and we don't
+        // need to deal with every possible url (I hope...)
+        let host = match url[scheme_ind..].find('/') {
+            Some(end) => &url[scheme_ind..scheme_ind + end],
+            None => &url[scheme_ind..],
+        };
+
+        // trim port
+        let host = host.split(':').next().unwrap();
 
         (format!("{host}-{ident}"), url.to_owned())
     };
