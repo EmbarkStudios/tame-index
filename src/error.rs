@@ -16,7 +16,6 @@ pub enum Error {
     InvalidUrl(#[from] InvalidUrl),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
-    #[cfg(feature = "combo-index")]
     #[error(transparent)]
     Toml(#[from] toml::de::Error),
     #[error("index entry contained no versions for the crate")]
@@ -26,6 +25,8 @@ pub enum Error {
     #[cfg(feature = "git")]
     #[error(transparent)]
     Git(#[from] crate::index::git_remote::GitError),
+    #[error(transparent)]
+    Semver(#[from] semver::Error),
 }
 
 impl From<std::path::PathBuf> for Error {
