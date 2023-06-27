@@ -397,8 +397,6 @@ fn non_main_local_branch() {
     ))
     .unwrap();
 
-    dbg!(local_td.td.into_path());
-
     let first = utils::fake_krate("first", 1);
     remote.commit(&first);
 
