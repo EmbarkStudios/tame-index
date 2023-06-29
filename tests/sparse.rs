@@ -175,3 +175,29 @@ fn parse_modified_response() {
         assert_eq!(modified_krate, cached_krate);
     }
 }
+
+/// Ensure we can actually send a request to crates.io and parse the response
+#[test]
+#[cfg(all(feature = "sparse", feature = "sparse-rustls-tls"))]
+fn end_to_end() {
+    let td = utils::tempdir();
+    let index = SparseIndex::with_path(&td, tame_index::CRATES_IO_HTTP_INDEX).unwrap();
+
+    let client = reqwest::blocking::Client::builder()
+        .http2_prior_knowledge()
+        .build()
+        .unwrap();
+
+    let rsi = tame_index::index::RemoteSparseIndex::new(index, client);
+
+    let spdx_krate = rsi
+        .krate("spdx".try_into().unwrap(), true)
+        .expect("failed to retrieve spdx")
+        .expect("failed to find spdx");
+
+    spdx_krate
+        .versions
+        .iter()
+        .find(|iv| iv.version == semver::Version::new(0, 10, 1))
+        .expect("failed to find expected version");
+}
