@@ -258,19 +258,32 @@ mod test {
             )
         );
 
-        // I've confirmed this also works with a custom registry, unfortunately
-        // that one includes a secret key as part of the url which would allow
-        // anyone to publish to the registry, so uhh...here's a fake one instead
+        const NON_CRATES_IO_GITHUB: &str = "https://github.com/EmbarkStudios/cargo-test-index";
         assert_eq!(
-            get_index_details(
-                "https://dl.cloudsmith.io/aBcW1234aBcW1234/embark/rust/cargo/index.git",
-                Some(PathBuf::new())
-            )
-            .unwrap(),
+            get_index_details(NON_CRATES_IO_GITHUB, Some(PathBuf::new())).unwrap(),
             (
-                "registry/index/dl.cloudsmith.io-ff79e51ddd2b38fd".into(),
-                "https://dl.cloudsmith.io/aBcW1234aBcW1234/embark/rust/cargo/index.git".to_owned()
+                "registry/index/github.com-655148e0a865c9e0".into(),
+                NON_CRATES_IO_GITHUB.to_owned(),
             )
+        );
+
+        const NON_GITHUB_INDEX: &str =
+            "https://dl.cloudsmith.io/public/embark/deny/cargo/index.git";
+        assert_eq!(
+            get_index_details(NON_GITHUB_INDEX, Some(PathBuf::new())).unwrap(),
+            (
+                "registry/index/dl.cloudsmith.io-955e041deb7d37e6".into(),
+                NON_GITHUB_INDEX.to_owned(),
+            )
+        );
+
+        // Just verifies that any non git+ or sparse+ url is treated as a git
+        // registry for purposes of hashing
+        const FAKE_REGISTRY: &str = "https://github.com/RustSec/advisory-db";
+
+        assert_eq!(
+            url_to_local_dir(FAKE_REGISTRY).unwrap().dir_name,
+            "github.com-a946fc29ac602819"
         );
     }
 }
