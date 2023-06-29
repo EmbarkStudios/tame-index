@@ -156,8 +156,8 @@ impl RemoteGitIndex {
         const DIR: gix::remote::Direction = gix::remote::Direction::Fetch;
 
         let mut perform_fetch = || -> Result<(), GitError> {
-            // Attempt to lookup the remote we _think_ we should use first, otherwise
-            // fallback to getting the remote for the current HEAD
+            // Attempt to lookup the remote we _think_ we should use first,
+            // otherwise fallback to getting the remote for the current HEAD
             let mut remote = if let Some(remote) = self
                 .remote_name
                 .as_deref()

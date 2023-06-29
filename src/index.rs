@@ -196,6 +196,20 @@ impl ComboIndexCache {
     }
 }
 
+impl From<SparseIndex> for ComboIndexCache {
+    #[inline]
+    fn from(si: SparseIndex) -> Self {
+        Self::Sparse(si)
+    }
+}
+
+impl From<GitIndex> for ComboIndexCache {
+    #[inline]
+    fn from(gi: GitIndex) -> Self {
+        Self::Git(gi)
+    }
+}
+
 /// Calls the specified function for each cargo config located according to
 /// cargo's standard hierarchical structure
 ///
