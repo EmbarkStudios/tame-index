@@ -56,7 +56,13 @@ impl FakeRemote {
             .set_raw_value("author", None, "name", "Integration Test")
             .unwrap();
         config
+            .set_raw_value("committer", None, "name", "Integration Test")
+            .unwrap();
+        config
             .set_raw_value("author", None, "email", "tests@integration.se")
+            .unwrap();
+        config
+            .set_raw_value("committer", None, "email", "tests@integration.se")
             .unwrap();
 
         config.commit_auto_rollback().unwrap()
