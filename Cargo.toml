@@ -6,4 +6,51 @@ rust-version = "1.70.0"
 description = "Provides access to local and remote cargo registry indices"
 license = "Apache-2.0 OR MIT"
 
+[features]
+default = []
+# Enables the built-in support for fetching and reading a git registry index
+git = ["dep:gix"]
+# Enables the built-in support for requesting index entries from a HTTP sparse registry index
+sparse = ["dep:reqwest"]
+
 [dependencies]
+# All paths are assumed to be utf-8 for ease of use and implementation
+camino = "1.1"
+# Used to find the location of the local `CARGO_HOME`
+home = "0.5"
+# Allows calling crates to provide their own HTTP implementation
+http = "0.2"
+# Nicer scanning through bytes
+memchr = "2.5"
+# Nicer versions for users
+semver = { version = "1.0", features = ["serde"] }
+# Serialization
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = "1.0"
+# Smaller fixed size strings with heap fallback
+smol_str = { version = "0.2.0", features = ["serde"] }
+# Laziness
+thiserror = "1.0"
+# cargo config parsing
+toml = "0.7"
+# Faster hashing
+twox-hash = { version = "1.6", default-features = false }
+
+[dependencies.gix]
+optional = true
+version = "0.48"
+default-features = false
+features = [
+    "max-performance-safe",
+    "blocking-network-client",
+    "blocking-http-transport-reqwest-rust-tls",
+]
+
+[dependencies.reqwest]
+optional = true
+version = "0.11"
+default-features = false
+features = ["blocking", "gzip", "rustls-tls"]
+
+[dev-dependencies]
+tempfile = "3.6"
