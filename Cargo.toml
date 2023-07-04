@@ -10,16 +10,8 @@ license = "Apache-2.0 OR MIT"
 default = []
 # Enables the built-in support for fetching and reading a git registry index
 git = ["dep:gix"]
-# Enables the use of reqwest with rustls-tsl as the HTTP implementation. Recommended.
-git-reqwest = ["gix?/blocking-http-transport-reqwest-rust-tls"]
-# Enables the use of curl with native tls as the HTTP implementation. Not recommended.
-git-curl = ["gix?/blocking-http-transport-curl"]
 # Enables the built-in support for requesting index entries from a HTTP sparse registry index
 sparse = ["dep:reqwest"]
-# Enables rustls-tls as the tls implementation for the HTTP client. Recommended.
-sparse-rustls-tls = ["reqwest?/rustls-tls"]
-# Enables native-tls as the tls implementation for the HTTP client. Not recommended.
-sparse-native-tls = ["reqwest?/native-tls"]
 
 [dependencies]
 # All paths are assumed to be utf-8 for ease of use and implementation
@@ -46,15 +38,19 @@ twox-hash = { version = "1.6", default-features = false }
 
 [dependencies.gix]
 optional = true
-version = "0.47"
+version = "0.48"
 default-features = false
-features = ["max-performance-safe", "blocking-network-client"]
+features = [
+    "max-performance-safe",
+    "blocking-network-client",
+    "blocking-http-transport-reqwest-rust-tls",
+]
 
 [dependencies.reqwest]
 optional = true
 version = "0.11"
 default-features = false
-features = ["blocking", "gzip"]
+features = ["blocking", "gzip", "rustls-tls"]
 
 [dev-dependencies]
 tempfile = "3.6"
