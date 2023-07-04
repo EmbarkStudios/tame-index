@@ -3,6 +3,7 @@ use crate::{Error, IndexKrate, KrateName};
 pub use reqwest::blocking::Client;
 pub use reqwest::Client as AsyncClient;
 
+/// Allows **blocking** access to a remote HTTP sparse registry index
 pub struct RemoteSparseIndex {
     index: SparseIndex,
     client: Client,
@@ -25,8 +26,9 @@ impl RemoteSparseIndex {
     /// Gets the latest index metadata for the crate
     ///
     /// Network I/O is _always_ performed when calling this method, however the
-    /// reponse from the remote registry will be empty of contents other than headers
-    /// if the local cache entry for the crate is up to date with th latest in the index
+    /// response from the remote registry will be empty of contents other than
+    /// headers if the local cache entry for the crate is up to date with the
+    /// latest in the index
     pub fn krate(
         &self,
         name: KrateName<'_>,
@@ -64,6 +66,7 @@ impl RemoteSparseIndex {
     }
 }
 
+/// Allows **async** access to a remote HTTP sparse registry index
 pub struct AsyncRemoteSparseIndex {
     index: SparseIndex,
     client: AsyncClient,

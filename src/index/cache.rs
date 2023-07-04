@@ -34,6 +34,8 @@ const INDEX_V_MAX_BYTES: [u8; 4] = INDEX_V_MAX.to_le_bytes();
 
 use crate::{CacheError, Error, IndexKrate, KrateName, PathBuf};
 
+/// A wrapper around a byte buffer that has been (partially) validated to be a
+/// valid cache entry
 pub struct ValidCacheEntry<'buffer> {
     /// The cache entry's revision
     ///
@@ -51,6 +53,11 @@ pub struct ValidCacheEntry<'buffer> {
 
 impl<'buffer> ValidCacheEntry<'buffer> {
     /// Attempts to read a cache entry from a block of bytes.
+    ///
+    /// This can fail for a few reasons
+    /// 1. The cache version does not match the version(s) supported
+    /// 2. The index version is higher than that supported
+    /// 3. There is not at least 1 version entry
     pub fn read(mut buffer: &'buffer [u8]) -> Result<Self, CacheError> {
         let cache_version = *buffer.first().ok_or(CacheError::InvalidCacheEntry)?;
 

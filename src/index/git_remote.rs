@@ -271,7 +271,9 @@ impl RemoteGitIndex {
     }
 }
 
+/// Errors that can occur during a git operation
 #[derive(Debug, thiserror::Error)]
+#[allow(missing_docs)]
 pub enum GitError {
     #[error(transparent)]
     ClonePrep(#[from] gix::clone::Error),

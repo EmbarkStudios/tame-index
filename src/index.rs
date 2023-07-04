@@ -1,9 +1,14 @@
+//! Provides functionality for interacting with both local and remote registry
+//! indices
+
 pub mod cache;
 #[cfg(all(feature = "git", feature = "sparse"))]
 mod combo;
+#[allow(missing_docs)]
 pub mod git;
 #[cfg(feature = "git")]
 pub(crate) mod git_remote;
+#[allow(missing_docs)]
 pub mod sparse;
 #[cfg(feature = "sparse")]
 mod sparse_remote;
@@ -66,9 +71,11 @@ impl IndexConfig {
 
 use crate::{utils, Error, Path, PathBuf};
 
-/// The default crates.io index
+/// Provides simpler access to the cache for an index, regardless of the registry kind
 pub enum ComboIndexCache {
+    /// A git index
     Git(GitIndex),
+    /// A sparse HTTP index
     Sparse(SparseIndex),
 }
 

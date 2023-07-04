@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 pub mod error;
 pub mod index;
 pub mod krate;
@@ -11,6 +13,8 @@ pub use index::{
 };
 pub use krate::{IndexDependency, IndexKrate, IndexVersion};
 
+/// Used to wrap user-provided strings so that bad crate names are required to be handled
+/// separately from things more outside the user control such as I/O errors
 #[derive(Copy, Clone)]
 pub struct KrateName<'name>(&'name str);
 

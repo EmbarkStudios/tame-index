@@ -1,5 +1,10 @@
+//! Provides several useful functions for determining the disk location of a
+//! remote registry index
+
 use crate::{Error, InvalidUrl, InvalidUrlError, PathBuf};
 
+/// Returns the storage directory (in utf-8) used by Cargo, often knowns as
+/// `.cargo` or `CARGO_HOME`
 #[inline]
 pub fn cargo_home() -> Result<crate::PathBuf, crate::Error> {
     Ok(crate::PathBuf::from_path_buf(home::cargo_home()?)?)

@@ -1,3 +1,5 @@
+//! Provides types for the structured metadata stored in a registry index
+
 mod dedupe;
 
 use crate::Error;
@@ -7,27 +9,36 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::{collections::BTreeMap, sync::Arc};
 
+/// A mapping of feature name to the features it enables
 pub type FeatureMap = BTreeMap<String, Vec<String>>;
 
 /// A single version of a crate (package) published to the index
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct IndexVersion {
+    /// [Name](https://doc.rust-lang.org/cargo/reference/manifest.html#the-name-field)
     pub name: SmolStr,
+    /// [Version](https://doc.rust-lang.org/cargo/reference/manifest.html#the-version-field)
     #[serde(rename = "vers")]
     pub version: Version,
+    /// [Dependencies](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html)
     pub deps: Arc<[IndexDependency]>,
+    /// The SHA-256 for this crate version's tarball
     #[serde(rename = "cksum")]
     pub checksum: Chksum,
+    /// [Features](https://doc.rust-lang.org/cargo/reference/features.html)
     pub features: Arc<FeatureMap>,
     /// It's wrapped in `Option<Box>` to reduce size of the struct when the field is unused (i.e. almost always)
     /// <https://rust-lang.github.io/rfcs/3143-cargo-weak-namespaced-features.html#index-changes>
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[allow(clippy::box_collection)]
     pub features2: Option<Box<FeatureMap>>,
+    /// Whether the crate is yanked from the remote index or not
     #[serde(default)]
     pub yanked: bool,
+    /// [Links](https://doc.rust-lang.org/cargo/reference/manifest.html#the-links-field)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub links: Option<Box<SmolStr>>,
+    /// [Rust Version](https://doc.rust-lang.org/cargo/reference/manifest.html#the-rust-version-field)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rust_version: Option<SmolStr>,
 }
@@ -98,19 +109,26 @@ impl IndexVersion {
 pub struct IndexDependency {
     /// Dependency's arbitrary nickname (it may be an alias). Use [`Self::crate_name`] for actual crate name.
     pub name: SmolStr,
+    /// The version requirement, as a string
     pub req: SmolStr,
     /// Double indirection to remove size from this struct, since the features are rarely set
     pub features: Box<Box<[String]>>,
+    /// The name of the actual crate, if it was renamed in the crate's manifest
     #[serde(skip_serializing_if = "Option::is_none")]
     pub package: Option<Box<SmolStr>>,
+    /// If it is an optional dependency
     pub optional: bool,
+    /// True if the default features are enabled
     pub default_features: bool,
+    /// Cfg expression applied to the dependency
     pub target: Option<Box<SmolStr>>,
+    /// The kind of the dependency
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kind: Option<DependencyKind>,
 }
 
 impl IndexDependency {
+    /// Gets the version requirement for the dependency as a [`semver::VersionReq`]
     #[inline]
     pub fn version_requirement(&self) -> semver::VersionReq {
         self.req.parse().unwrap()
@@ -322,6 +340,8 @@ impl IndexKrate {
     }
 }
 
+/// A SHA-256 checksum, this is used by cargo to verify the contents of a crate's
+/// tarball
 #[derive(Clone, Eq, PartialEq)]
 pub struct Chksum(pub [u8; 32]);
 
