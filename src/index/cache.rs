@@ -99,7 +99,7 @@ impl<'buffer> ValidCacheEntry<'buffer> {
         })
     }
 
-    /// Reads this cache entry into a [`Krate`]
+    /// Deserializes this cache entry into a [`IndexKrate`]
     ///
     /// If specified, the `revision` will be used to ignore cache entries
     /// that are outdated

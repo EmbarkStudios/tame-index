@@ -1,7 +1,8 @@
 use super::IndexCache;
 use crate::{utils::cargo_home, Error, IndexKrate, KrateName, PathBuf};
 
-/// The URL of the crates.io index for use with git, see [`Index::with_path`]
+/// The URL of the crates.io index for use with git, see [`GitIndex::with_url`],
+/// [`GitIndex::with_path`], or [`GitIndex::crates_io`]
 pub const CRATES_IO_INDEX: &str = "https://github.com/rust-lang/crates.io-index";
 
 /// Allows access to a cargo git registry index

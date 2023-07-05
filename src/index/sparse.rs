@@ -1,8 +1,8 @@
 use super::{cache::ValidCacheEntry, IndexCache};
 use crate::{utils::cargo_home, Error, HttpError, IndexKrate, KrateName, PathBuf};
 
-/// The default URL of the crates.io HTTP index, see [`Index::from_url`],
-/// [`Index::with_path`], or [`Index::new_cargo_default`]
+/// The default URL of the crates.io HTTP index, see [`SparseIndex::with_url`],
+/// [`SparseIndex::with_path`], or [`SparseIndex::crates_io`]
 pub const CRATES_IO_HTTP_INDEX: &str = "sparse+https://index.crates.io/";
 
 /// Wrapper around managing a sparse HTTP index, re-using Cargo's local disk caches.
@@ -10,7 +10,8 @@ pub const CRATES_IO_HTTP_INDEX: &str = "sparse+https://index.crates.io/";
 /// This implementation does no network I/O at all. If you want to make requests
 /// to the remote index you may use the [`Self::make_remote_request`] and
 /// [`Self::parse_remote_response`] methods, or you can enable the `sparse` feature
-/// and and use [`RemoteSparseIndex`] or [`AsyncRemoteSparseIndex`]
+/// and and use [`RemoteSparseIndex`](crate::index::RemoteSparseIndex) or
+/// [`AsyncRemoteSparseIndex`](crate::index::AsyncRemoteSparseIndex)
 pub struct SparseIndex {
     cache: IndexCache,
     url: String,

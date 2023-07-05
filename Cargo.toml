@@ -54,3 +54,6 @@ features = ["blocking", "gzip", "rustls-tls"]
 
 [dev-dependencies]
 tempfile = "3.6"
+
+[package.metadata.docs.rs]
+all-features = true

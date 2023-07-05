@@ -134,15 +134,15 @@ impl IndexDependency {
         self.req.parse().unwrap()
     }
 
-    /// Features unconditionally enabled when using this dependency,
-    /// in addition to [`Dependency::has_default_features`] and features enabled
-    /// through the parent crate's feature list.
+    /// Features unconditionally enabled when using this dependency, in addition
+    /// to [`Self::has_default_features`] and features enabled through the
+    /// parent crate's feature list.
     #[inline]
     pub fn features(&self) -> &[String] {
         &self.features
     }
 
-    /// If it's optional, it implies a feature of its [`Dependency::name`], and
+    /// If it's optional, it implies a feature of its [`Self::name`], and
     /// can be enabled through the parent crate's features.
     #[inline]
     pub fn is_optional(&self) -> bool {
@@ -181,7 +181,7 @@ impl IndexDependency {
     /// like this:
     ///
     /// ```toml
-    /// serde_lib = {version = "1", package = "serde"}
+    /// serde_lib = { version = "1", package = "serde" }
     /// ```
     ///
     /// ...which means that it uses the crate `serde` but imports
@@ -225,7 +225,7 @@ impl IndexKrate {
         self.versions
             .iter()
             .max_by_key(|v| &v.version)
-            // Safety: Versions inside the index will always adhere to
+            // SAFETY: Versions inside the index will always adhere to
             // semantic versioning. If a crate is inside the index, at
             // least one version is available.
             .unwrap()

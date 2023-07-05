@@ -94,9 +94,9 @@ pub fn canonicalize_url(url: &str) -> Result<String, Error> {
 ///
 /// This function currently only supports 3 different URL kinds.
 ///
-/// * (?:registry+)?<git registry url>
-/// * sparse+<sparse registry url>
-/// * git+<git repo url>
+/// * `(?:registry+)?<git registry url>`
+/// * `sparse+<sparse registry url>`
+/// * `git+<git repo url>`
 #[allow(deprecated)]
 pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
     use std::hash::{Hash, Hasher, SipHasher};
