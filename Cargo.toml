@@ -5,6 +5,9 @@ edition = "2021"
 rust-version = "1.70.0"
 description = "Provides access to local and remote cargo registry indices"
 license = "Apache-2.0 OR MIT"
+documentation = "https://docs.rs/tame-index"
+homepage = "https://github.com/EmbarkStudios/tame-index"
+repository = "https://github.com/EmbarkStudios/tame-index"
 
 [features]
 default = []
@@ -54,3 +57,6 @@ features = ["blocking", "gzip", "rustls-tls"]
 
 [dev-dependencies]
 tempfile = "3.6"
+
+[package.metadata.docs.rs]
+all-features = true

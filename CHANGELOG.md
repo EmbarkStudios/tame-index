@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#1](https://github.com/EmbarkStudios/tame-index/pull/1) added the initial working implementation for this crate
 
 ## [0.0.1] - 2023-06-19
 ### Added
