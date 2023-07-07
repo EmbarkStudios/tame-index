@@ -8,6 +8,7 @@ mod combo;
 pub mod git;
 #[cfg(feature = "git")]
 pub(crate) mod git_remote;
+pub mod location;
 #[allow(missing_docs)]
 pub mod sparse;
 #[cfg(feature = "sparse")]
@@ -19,6 +20,7 @@ pub use combo::ComboIndex;
 pub use git::GitIndex;
 #[cfg(feature = "git")]
 pub use git_remote::RemoteGitIndex;
+pub use location::{IndexLocation, IndexPath, IndexUrl};
 pub use sparse::SparseIndex;
 #[cfg(feature = "sparse")]
 pub use sparse_remote::{AsyncRemoteSparseIndex, RemoteSparseIndex};
@@ -69,7 +71,7 @@ impl IndexConfig {
     }
 }
 
-use crate::{utils, Error, Path, PathBuf};
+use crate::{Error, Path, PathBuf};
 
 /// Provides simpler access to the cache for an index, regardless of the registry kind
 pub enum ComboIndexCache {
@@ -93,6 +95,22 @@ impl ComboIndexCache {
         }
     }
 
+    /// Constructs a [`Self`] for the specified index.
+    ///
+    /// See [`Self::crates_io`] if you want to create a crates.io index based
+    /// upon other information in the user's environment
+    pub fn new(il: IndexLocation<'_>) -> Result<Self, Error> {
+        let index = if il.url.is_sparse() {
+            let sparse = SparseIndex::new(il)?;
+            Self::Sparse(sparse)
+        } else {
+            let git = GitIndex::new(il)?;
+            Self::Git(git)
+        };
+
+        Ok(index)
+    }
+
     /// Opens the default index for crates.io, depending on the configuration and
     /// version of cargo
     ///
@@ -102,20 +120,17 @@ impl ComboIndexCache {
     /// 3. If not specified, detects the version of cargo (see
     /// [`Self::cargo_version`]), and uses that to determine the appropriate default
     pub fn crates_io(
-        root: Option<PathBuf>,
+        config_root: Option<PathBuf>,
         cargo_home: Option<PathBuf>,
         cargo_version: Option<&str>,
     ) -> Result<Self, Error> {
         // If the crates.io registry has been replaced it doesn't matter what
         // the protocol for it has been changed to
-        if let Some(replacement) = get_crates_io_replacement(root.clone(), cargo_home.as_deref())? {
-            let (path, url) = utils::get_index_details(&replacement, cargo_home)?;
-
-            return Ok(if url.starts_with("sparse+http") {
-                Self::Sparse(SparseIndex::at_path(path, url))
-            } else {
-                Self::Git(GitIndex::at_path(path, url))
-            });
+        if let Some(replacement) =
+            get_crates_io_replacement(config_root.clone(), cargo_home.as_deref())?
+        {
+            let il = IndexLocation::new(IndexUrl::NonCratesIo(&replacement)).with_root(cargo_home);
+            return Self::new(il);
         }
 
         let sparse_index = match std::env::var("CARGO_REGISTRIES_CRATES_IO_PROTOCOL")
@@ -125,18 +140,19 @@ impl ComboIndexCache {
             Some("sparse") => true,
             Some("git") => false,
             _ => {
-                let sparse_index = read_cargo_config(root, cargo_home.as_deref(), |config| {
-                    config
-                        .get("registries")
-                        .and_then(|v| v.get("crates-io"))
-                        .and_then(|v| v.get("protocol"))
-                        .and_then(|v| v.as_str())
-                        .and_then(|v| match v {
-                            "sparse" => Some(true),
-                            "git" => Some(false),
-                            _ => None,
-                        })
-                })?;
+                let sparse_index =
+                    read_cargo_config(config_root, cargo_home.as_deref(), |config| {
+                        config
+                            .get("registries")
+                            .and_then(|v| v.get("crates-io"))
+                            .and_then(|v| v.get("protocol"))
+                            .and_then(|v| v.as_str())
+                            .and_then(|v| match v {
+                                "sparse" => Some(true),
+                                "git" => Some(false),
+                                _ => None,
+                            })
+                    })?;
 
                 if let Some(si) = sparse_index {
                     si
@@ -152,19 +168,14 @@ impl ComboIndexCache {
             }
         };
 
-        let url = if sparse_index {
-            crate::CRATES_IO_HTTP_INDEX
-        } else {
-            crate::CRATES_IO_INDEX
-        };
-
-        let (path, canonical) = utils::get_index_details(url, cargo_home)?;
-
-        Ok(if sparse_index {
-            Self::Sparse(SparseIndex::at_path(path, canonical))
-        } else {
-            Self::Git(GitIndex::at_path(path, canonical))
-        })
+        Self::new(
+            IndexLocation::new(if sparse_index {
+                IndexUrl::CratesIoSparse
+            } else {
+                IndexUrl::CratesIoGit
+            })
+            .with_root(cargo_home),
+        )
     }
 
     /// Retrieves the current version of cargo being used

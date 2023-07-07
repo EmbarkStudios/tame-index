@@ -1,8 +1,7 @@
 use super::{cache::ValidCacheEntry, IndexCache};
-use crate::{utils::cargo_home, Error, HttpError, IndexKrate, KrateName, PathBuf};
+use crate::{Error, HttpError, IndexKrate, KrateName};
 
-/// The default URL of the crates.io HTTP index, see [`SparseIndex::with_url`],
-/// [`SparseIndex::with_path`], or [`SparseIndex::crates_io`]
+/// The default URL of the crates.io HTTP index
 pub const CRATES_IO_HTTP_INDEX: &str = "sparse+https://index.crates.io/";
 
 /// Wrapper around managing a sparse HTTP index, re-using Cargo's local disk caches.
@@ -18,59 +17,22 @@ pub struct SparseIndex {
 }
 
 impl SparseIndex {
-    /// Creates a view over the sparse HTTP index from a provided URL
-    ///
-    /// Note this opens the same location on disk that Cargo uses for that
-    /// registry index's metadata and cache.
-    ///
-    /// Use [`Self::with_path`] if you wish to override the disk location
+    /// Creates a new sparse index for the specified location
     #[inline]
-    pub fn with_url(url: &str) -> Result<Self, Error> {
-        Self::with_path(cargo_home()?, url)
-    }
-
-    /// Creates an index for the default crates.io registry, using the same
-    /// disk location as Cargo itself.
-    ///
-    /// This is the recommended way to access the crates.io sparse index.
-    #[inline]
-    pub fn crates_io() -> Result<Self, Error> {
-        Self::with_url(CRATES_IO_HTTP_INDEX)
-    }
-
-    /// Creates a view over the sparse HTTP index from the provided URL, rooted
-    /// at the specified location
-    ///
-    /// Use this method if you wish to create a sparse index with the canonical
-    /// cargo directory layout, but rooted at a location other than the default
-    #[inline]
-    pub fn with_path(root: impl Into<PathBuf>, url: impl AsRef<str>) -> Result<Self, Error> {
-        let url = url.as_ref();
-        // It is required to have the sparse+ scheme modifier for sparse urls as
-        // they are part of the short ident hash calculation done by cargo
-        if !url.starts_with("sparse+http") {
+    pub fn new(il: crate::index::IndexLocation<'_>) -> Result<Self, Error> {
+        if !il.url.is_sparse() {
             return Err(crate::InvalidUrl {
-                url: url.to_owned(),
+                url: il.url.as_str().to_owned(),
                 source: crate::InvalidUrlError::MissingSparse,
             }
             .into());
         }
 
-        let (path, url) = crate::utils::get_index_details(url, Some(root.into()))?;
-        Ok(Self::at_path(path, url))
-    }
-
-    /// Creates a local index exactly at the specified path for the specified remote url
-    #[inline]
-    pub fn at_path(path: PathBuf, mut url: String) -> Self {
-        if !url.ends_with('/') {
-            url.push('/');
-        }
-
-        Self {
+        let (path, url) = il.into_parts()?;
+        Ok(Self {
             cache: IndexCache::at_path(path),
             url,
-        }
+        })
     }
 
     /// Get the configuration of the index.

@@ -81,6 +81,9 @@ pub enum InvalidUrlError {
     /// Unable to find the `<scheme>://`
     #[error("the scheme is missing")]
     MissingScheme,
+    /// Attempted to construct a git index with a sparse URL
+    #[error("attempted to create a git index for a sparse URL")]
+    SparseForGit,
 }
 
 /// Errors related to a local index cache

@@ -1,7 +1,21 @@
 #![cfg(feature = "git")]
 
 mod utils;
-use tame_index::{index::RemoteGitIndex, GitIndex, IndexKrate};
+use tame_index::{index::RemoteGitIndex, GitIndex, IndexKrate, IndexLocation, IndexPath, IndexUrl};
+
+fn remote_index(
+    path: impl AsRef<tame_index::Path>,
+    url: impl AsRef<tame_index::Path>,
+) -> RemoteGitIndex {
+    RemoteGitIndex::new(
+        GitIndex::new(IndexLocation {
+            url: IndexUrl::NonCratesIo(url.as_ref().as_str()),
+            root: IndexPath::Exact(path.as_ref().to_owned()),
+        })
+        .unwrap(),
+    )
+    .unwrap()
+}
 
 /// For testing purposes we create a local git repository as the remote for tests
 /// so that we avoid
@@ -123,11 +137,7 @@ impl FakeRemote {
     fn local(&self) -> (RemoteGitIndex, utils::TempDir) {
         let td = utils::tempdir();
 
-        let rgi = RemoteGitIndex::new(GitIndex::at_path(
-            td.path().to_owned(),
-            self.td.path().as_str().to_owned(),
-        ))
-        .unwrap();
+        let rgi = remote_index(&td, &self.td);
 
         (rgi, td)
     }
@@ -170,11 +180,7 @@ fn opens_existing() {
         krate,
     );
 
-    let second = RemoteGitIndex::new(GitIndex::at_path(
-        td.path().to_owned(),
-        remote.td.path().as_str().to_owned(),
-    ))
-    .unwrap();
+    let second = remote_index(&td, &remote.td);
 
     assert_eq!(
         second.local().head_commit().unwrap(),
@@ -397,11 +403,7 @@ fn non_main_local_branch() {
         assert_eq!(commit, repo.head_commit().unwrap().id);
     }
 
-    let mut rgi = RemoteGitIndex::new(GitIndex::at_path(
-        local_td.path().to_owned(),
-        remote.td.path().as_str().to_owned(),
-    ))
-    .unwrap();
+    let mut rgi = remote_index(&local_td, &remote.td);
 
     let first = utils::fake_krate("first", 1);
     remote.commit(&first);

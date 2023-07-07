@@ -1,14 +1,20 @@
 mod utils;
 
 use http::header;
-use tame_index::SparseIndex;
+use tame_index::{IndexLocation, IndexUrl, SparseIndex};
+
+#[inline]
+fn crates_io(path: impl AsRef<tame_index::Path>) -> SparseIndex {
+    SparseIndex::new(
+        IndexLocation::new(IndexUrl::CratesIoSparse).with_root(Some(path.as_ref().to_owned())),
+    )
+    .unwrap()
+}
 
 /// Validates the we get a valid root and krate url
 #[test]
 fn opens_crates_io() {
-    let index =
-        SparseIndex::with_path(env!("CARGO_MANIFEST_DIR"), tame_index::CRATES_IO_HTTP_INDEX)
-            .unwrap();
+    let index = crates_io(env!("CARGO_MANIFEST_DIR"));
 
     assert_eq!(index.url(), "https://index.crates.io/");
     assert_eq!(
@@ -20,9 +26,7 @@ fn opens_crates_io() {
 /// Validates a request can be made for a crate that doesn't have a local cache entry
 #[test]
 fn make_request_without_cache() {
-    let index =
-        SparseIndex::with_path(env!("CARGO_MANIFEST_DIR"), tame_index::CRATES_IO_HTTP_INDEX)
-            .unwrap();
+    let index = crates_io(env!("CARGO_MANIFEST_DIR"));
 
     let req = index
         .make_remote_request("serde".try_into().unwrap())
@@ -47,7 +51,7 @@ const DATE: &str = "Thu, 22 Oct 2023 09:40:03 GMT";
 fn make_request_with_cache() {
     let td = utils::tempdir();
 
-    let index = SparseIndex::with_path(&td, tame_index::CRATES_IO_HTTP_INDEX).unwrap();
+    let index = crates_io(&td);
 
     {
         let etag_krate = utils::fake_krate("etag-krate", 2);
@@ -85,8 +89,7 @@ fn make_request_with_cache() {
 #[test]
 fn parse_unmodified_response() {
     let td = utils::tempdir();
-
-    let index = SparseIndex::with_path(&td, tame_index::CRATES_IO_HTTP_INDEX).unwrap();
+    let index = crates_io(&td);
 
     let etag_krate = utils::fake_krate("etag-krate", 2);
     index
@@ -112,8 +115,7 @@ fn parse_unmodified_response() {
 #[test]
 fn parse_modified_response() {
     let td = utils::tempdir();
-
-    let index = SparseIndex::with_path(&td, tame_index::CRATES_IO_HTTP_INDEX).unwrap();
+    let index = crates_io(&td);
 
     {
         let etag_krate = utils::fake_krate("etag-krate", 3);
@@ -178,10 +180,10 @@ fn parse_modified_response() {
 
 /// Ensure we can actually send a request to crates.io and parse the response
 #[test]
-#[cfg(all(feature = "sparse", feature = "sparse-rustls-tls"))]
+#[cfg(feature = "sparse")]
 fn end_to_end() {
     let td = utils::tempdir();
-    let index = SparseIndex::with_path(&td, tame_index::CRATES_IO_HTTP_INDEX).unwrap();
+    let index = crates_io(&td);
 
     let client = reqwest::blocking::Client::builder()
         .http2_prior_knowledge()

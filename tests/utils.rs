@@ -23,6 +23,13 @@ impl Default for TempDir {
     }
 }
 
+impl AsRef<Path> for TempDir {
+    #[inline]
+    fn as_ref(&self) -> &Path {
+        self.path()
+    }
+}
+
 impl AsRef<std::path::Path> for TempDir {
     #[inline]
     fn as_ref(&self) -> &std::path::Path {

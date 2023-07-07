@@ -1,8 +1,7 @@
 use super::IndexCache;
-use crate::{utils::cargo_home, Error, IndexKrate, KrateName, PathBuf};
+use crate::{Error, IndexKrate, KrateName, PathBuf};
 
-/// The URL of the crates.io index for use with git, see [`GitIndex::with_url`],
-/// [`GitIndex::with_path`], or [`GitIndex::crates_io`]
+/// The URL of the crates.io index for use with git
 pub const CRATES_IO_INDEX: &str = "https://github.com/rust-lang/crates.io-index";
 
 /// Allows access to a cargo git registry index
@@ -17,46 +16,23 @@ pub struct GitIndex {
 }
 
 impl GitIndex {
-    /// Creates a view over the sparse HTTP index from a provided URL
-    ///
-    /// Note this opens the same location on disk that Cargo uses for that
-    /// registry index's metadata and cache.
-    ///
-    /// Use [`Self::with_path`] if you wish to override the disk location
+    /// Creates a new git index for the specified location
     #[inline]
-    pub fn with_url(url: &str) -> Result<Self, Error> {
-        Self::with_path(cargo_home()?, url)
-    }
-
-    /// Creates an index for the default crates.io registry, using the same
-    /// disk location as Cargo itself.
-    ///
-    /// This is the recommended way to access the crates.io git index.
-    #[inline]
-    pub fn crates_io() -> Result<Self, Error> {
-        Self::with_url(CRATES_IO_INDEX)
-    }
-
-    /// Creates a view over the git index from the provided URL, rooted
-    /// at the specified location
-    #[inline]
-    pub fn with_path(root: impl Into<PathBuf>, url: impl AsRef<str>) -> Result<Self, Error> {
-        let (path, url) = crate::utils::get_index_details(url.as_ref(), Some(root.into()))?;
-        Ok(Self::at_path(path, url))
-    }
-
-    /// Creates a view over the git index at the exact specified path
-    #[inline]
-    pub fn at_path(path: PathBuf, mut url: String) -> Self {
-        if !url.ends_with('/') {
-            url.push('/');
+    pub fn new(il: crate::index::IndexLocation<'_>) -> Result<Self, Error> {
+        if il.url.is_sparse() {
+            return Err(crate::InvalidUrl {
+                url: il.url.as_str().to_owned(),
+                source: crate::InvalidUrlError::SparseForGit,
+            }
+            .into());
         }
 
-        Self {
+        let (path, url) = il.into_parts()?;
+        Ok(Self {
             cache: IndexCache::at_path(path),
             url,
             head: None,
-        }
+        })
     }
 
     /// Sets the sha-1 id for the head commit.
