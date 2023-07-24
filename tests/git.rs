@@ -1,7 +1,9 @@
 #![cfg(feature = "git")]
 
 mod utils;
-use tame_index::{index::RemoteGitIndex, GitIndex, IndexKrate, IndexLocation, IndexPath, IndexUrl};
+use tame_index::{
+    index::RemoteGitIndex, GitIndex, IndexKrate, IndexLocation, IndexPath, IndexUrl, Path,
+};
 
 fn remote_index(
     path: impl AsRef<tame_index::Path>,
@@ -9,12 +11,134 @@ fn remote_index(
 ) -> RemoteGitIndex {
     RemoteGitIndex::new(
         GitIndex::new(IndexLocation {
-            url: IndexUrl::NonCratesIo(url.as_ref().as_str()),
+            url: IndexUrl::NonCratesIo(url.as_ref().as_str().into()),
             root: IndexPath::Exact(path.as_ref().to_owned()),
         })
         .unwrap(),
     )
     .unwrap()
+}
+
+enum UpdateEntry {
+    Blob(gix::ObjectId),
+    Tree(UpdateTree),
+}
+
+type UpdateTree = std::collections::BTreeMap<String, UpdateEntry>;
+
+struct TreeUpdateBuilder {
+    update_tree: UpdateTree,
+}
+
+impl TreeUpdateBuilder {
+    fn new() -> Self {
+        Self {
+            update_tree: UpdateTree::new(),
+        }
+    }
+
+    fn upsert_blob(&mut self, path: &Path, oid: gix::ObjectId) {
+        let ancestors = path.parent().unwrap();
+        let file_name = path.file_name().unwrap();
+
+        let mut ct = &mut self.update_tree;
+
+        for comp in ancestors.components().filter_map(|com| {
+            if let camino::Utf8Component::Normal(n) = com {
+                Some(n)
+            } else {
+                None
+            }
+        }) {
+            let entry = ct
+                .entry(comp.to_owned())
+                .or_insert_with(|| UpdateEntry::Tree(UpdateTree::new()));
+
+            if let UpdateEntry::Tree(t) = entry {
+                ct = t;
+            } else {
+                panic!("blob already inserted");
+            }
+        }
+
+        if ct.contains_key(file_name) {
+            panic!("tree already inserted with same filename as blob");
+        }
+
+        ct.insert(file_name.to_owned(), UpdateEntry::Blob(oid));
+    }
+
+    fn create_updated(self, repo: &gix::Repository) -> gix::ObjectId {
+        let head_tree = repo.head_commit().unwrap().tree().unwrap();
+        Self::create_inner(self.update_tree, &head_tree, repo)
+    }
+
+    fn create_inner(
+        tree: UpdateTree,
+        current: &gix::Tree<'_>,
+        repo: &gix::Repository,
+    ) -> gix::ObjectId {
+        use gix::objs::{
+            tree::{Entry, EntryMode},
+            Tree,
+        };
+
+        let mut nt = Tree::empty();
+        let tree_ref = current.decode().unwrap();
+
+        // Since they are stored in a btreemap we don't have to worry about
+        // sorting here to satisfy the constraints of Tree
+        for (name, entry) in tree {
+            let filename = name.as_str().into();
+            match entry {
+                UpdateEntry::Blob(oid) => {
+                    nt.entries.push(Entry {
+                        mode: EntryMode::Blob,
+                        oid,
+                        filename,
+                    });
+                }
+                UpdateEntry::Tree(ut) => {
+                    // Check if there is already an existing tree
+                    let current_tree = tree_ref.entries.iter().find_map(|tre| {
+                        if tre.filename == name && tre.mode == EntryMode::Tree {
+                            Some(repo.find_object(tre.oid).unwrap().into_tree())
+                        } else {
+                            None
+                        }
+                    });
+                    let current_tree = current_tree.unwrap_or_else(|| repo.empty_tree());
+
+                    let oid = Self::create_inner(ut, &current_tree, repo);
+                    nt.entries.push(Entry {
+                        mode: EntryMode::Tree,
+                        oid,
+                        filename,
+                    });
+                }
+            }
+        }
+
+        // Insert all the entries from the old tree that weren't added/modified
+        // in this builder
+        for entry in tree_ref.entries {
+            if let Err(i) = nt
+                .entries
+                .binary_search_by_key(&entry.filename, |e| e.filename.as_ref())
+            {
+                nt.entries.insert(
+                    i,
+                    Entry {
+                        mode: entry.mode,
+                        oid: entry.oid.clone().into(),
+                        filename: entry.filename.to_owned(),
+                    },
+                );
+            }
+        }
+
+        repo.write_object(nt).unwrap().detach()
+    }
 }
 
 /// For testing purposes we create a local git repository as the remote for tests
@@ -27,6 +151,7 @@ fn remote_index(
 struct FakeRemote {
     repo: gix::Repository,
     td: utils::TempDir,
+    // The parent commit
     parent: gix::ObjectId,
     commits: u32,
 }
@@ -83,10 +208,6 @@ impl FakeRemote {
     }
 
     fn commit(&mut self, krate: &IndexKrate) -> gix::ObjectId {
-        use gix::objs::{
-            tree::{Entry, EntryMode},
-            Tree,
-        };
         let repo = Self::snapshot(&mut self.repo);
 
         let mut serialized = Vec::new();
@@ -96,28 +217,11 @@ impl FakeRemote {
         let rel_path = tame_index::PathBuf::from(name.relative_path(None));
 
         let blob_id = repo.write_blob(serialized).unwrap().into();
-        let mut tree = Tree::empty();
-        tree.entries.push(Entry {
-            mode: EntryMode::Blob,
-            oid: blob_id,
-            filename: rel_path.file_name().unwrap().into(),
-        });
 
-        let mut tree_id = repo.write_object(tree).unwrap().detach();
+        let mut tub = TreeUpdateBuilder::new();
+        tub.upsert_blob(Path::new(&rel_path), blob_id);
 
-        let mut parent = rel_path.parent();
-        // Now create all the parent trees to the root
-        while let Some(filename) = parent.and_then(|p| p.file_name()) {
-            let mut tree = Tree::empty();
-            tree.entries.push(Entry {
-                mode: EntryMode::Tree,
-                oid: tree_id,
-                filename: filename.into(),
-            });
-
-            tree_id = repo.write_object(tree).unwrap().detach();
-            parent = parent.unwrap().parent();
-        }
+        let tree_id = tub.create_updated(&repo);
 
         self.commits += 1;
 
@@ -190,7 +294,6 @@ fn opens_existing() {
     // This should be in the cache as it is file based not memory based
     assert_eq!(
         first
-            .local()
             .cached_krate("opens-existing".try_into().unwrap())
             .expect("failed to read cache file")
             .expect("expected cached krate"),
@@ -222,21 +325,23 @@ fn updates_cache() {
     );
 
     assert_eq!(
-        rgi.local()
-            .cached_krate("updates-cache".try_into().unwrap())
+        rgi.cached_krate("updates-cache".try_into().unwrap())
             .expect("failed to read cache file")
             .expect("expected krate"),
         krate,
     );
 }
 
-/// Validates we can fetch updates from the remote and invalidate cache entries
+/// Validates we can fetch updates from the remote and invalidate only the cache
+/// entries for the crates that have changed
 #[test]
 fn fetch_invalidates_cache() {
     let mut remote = FakeRemote::new();
 
     let krate = utils::fake_krate("invalidates-cache", 4);
-    let expected_head = remote.commit(&krate);
+    let same = utils::fake_krate("will-be-cached", 2);
+    remote.commit(&krate);
+    let expected_head = remote.commit(&same);
 
     let (mut rgi, _td) = remote.local();
 
@@ -245,12 +350,18 @@ fn fetch_invalidates_cache() {
         expected_head.to_hex().to_string()
     );
 
-    // This should not be in the cache
+    // These should not be in the cache
     assert_eq!(
         rgi.krate("invalidates-cache".try_into().unwrap(), true)
             .expect("failed to read git blob")
             .expect("expected krate"),
         krate,
+    );
+    assert_eq!(
+        rgi.krate("will-be-cached".try_into().unwrap(), true)
+            .expect("failed to read git blob")
+            .expect("expected krate"),
+        same,
     );
 
     // Update the remote
@@ -258,11 +369,16 @@ fn fetch_invalidates_cache() {
     let new_head = remote.commit(&new_krate);
 
     assert_eq!(
-        rgi.local()
-            .cached_krate("invalidates-cache".try_into().unwrap())
+        rgi.cached_krate("invalidates-cache".try_into().unwrap())
             .expect("failed to read cache file")
             .expect("expected krate"),
         krate,
+    );
+    assert_eq!(
+        rgi.cached_krate("will-be-cached".try_into().unwrap())
+            .expect("failed to read cache file")
+            .expect("expected krate"),
+        same,
     );
 
     // Perform fetch, which should invalidate the cache
@@ -274,7 +390,6 @@ fn fetch_invalidates_cache() {
     );
 
     assert!(rgi
-        .local()
         .cached_krate("invalidates-cache".try_into().unwrap())
         .unwrap()
         .is_none());
@@ -286,13 +401,20 @@ fn fetch_invalidates_cache() {
         new_krate,
     );
 
+    // This crate _should_ still be cached as it was not changed in the fetch
+    assert_eq!(
+        rgi.cached_krate("will-be-cached".try_into().unwrap())
+            .expect("failed to read cache file")
+            .expect("expected krate"),
+        same,
+    );
+
     // We haven't made new commits, so the fetch should not move HEAD and thus
     // cache entries should still be valid
     rgi.fetch().unwrap();
 
     assert_eq!(
-        rgi.local()
-            .cached_krate("invalidates-cache".try_into().unwrap())
+        rgi.cached_krate("invalidates-cache".try_into().unwrap())
             .unwrap()
             .unwrap(),
         new_krate
@@ -311,11 +433,18 @@ fn fetch_invalidates_cache() {
         expected_head.to_hex().to_string()
     );
 
-    assert!(rgi
-        .local()
-        .cached_krate("invalidates-cache".try_into().unwrap())
-        .unwrap()
-        .is_none());
+    assert_eq!(
+        rgi.cached_krate("invalidates-cache".try_into().unwrap())
+            .expect("failed to read cache file")
+            .expect("expected krate"),
+        new_krate,
+    );
+    assert_eq!(
+        rgi.cached_krate("will-be-cached".try_into().unwrap())
+            .expect("failed to read cache file")
+            .expect("expected krate"),
+        same,
+    );
 }
 
 /// gix uses a default branch name of `main`, but most cargo git indexes on users

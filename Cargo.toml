@@ -49,7 +49,7 @@ twox-hash = { version = "1.6", default-features = false }
 
 [dependencies.gix]
 optional = true
-version = "0.48"
+version = "0.50"
 default-features = false
 features = [
     "max-performance-safe",

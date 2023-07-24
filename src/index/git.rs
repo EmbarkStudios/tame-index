@@ -72,11 +72,15 @@ impl GitIndex {
 
     /// Writes the specified crate to the cache.
     ///
-    /// Note that no I/O will be performed if [`Self::set_head_commit`] has not
-    /// been set to `Some`
+    /// Note that no I/O will be performed if `blob_id` or [`Self::set_head_commit`]
+    /// has not been set to `Some`
     #[inline]
-    pub fn write_to_cache(&self, krate: &IndexKrate) -> Result<Option<PathBuf>, Error> {
-        let Some(head) = self.head_commit() else { return Ok(None); };
-        self.cache.write_to_cache(krate, head).map(Some)
+    pub fn write_to_cache(
+        &self,
+        krate: &IndexKrate,
+        blob_id: Option<&str>,
+    ) -> Result<Option<PathBuf>, Error> {
+        let Some(id) = blob_id.or_else(|| self.head_commit()) else { return Ok(None); };
+        self.cache.write_to_cache(krate, id).map(Some)
     }
 }
