@@ -5,8 +5,10 @@ pub use reqwest::Client as AsyncClient;
 
 /// Allows **blocking** access to a remote HTTP sparse registry index
 pub struct RemoteSparseIndex {
-    index: SparseIndex,
-    client: Client,
+    /// The local index this remote is wrapping
+    pub index: SparseIndex,
+    /// The client used to make requests to the remote index
+    pub client: Client,
 }
 
 impl RemoteSparseIndex {
@@ -15,12 +17,6 @@ impl RemoteSparseIndex {
     #[inline]
     pub fn new(index: SparseIndex, client: Client) -> Self {
         Self { index, client }
-    }
-
-    /// Splits into the component parts
-    #[inline]
-    pub fn into_parts(self) -> (SparseIndex, Client) {
-        (self.index, self.client)
     }
 
     /// Gets the latest index metadata for the crate
@@ -68,8 +64,10 @@ impl RemoteSparseIndex {
 
 /// Allows **async** access to a remote HTTP sparse registry index
 pub struct AsyncRemoteSparseIndex {
-    index: SparseIndex,
-    client: AsyncClient,
+    /// The local index this remote is wrapping
+    pub index: SparseIndex,
+    /// The client used to make requests to the remote index
+    pub client: AsyncClient,
 }
 
 impl AsyncRemoteSparseIndex {
@@ -78,12 +76,6 @@ impl AsyncRemoteSparseIndex {
     #[inline]
     pub fn new(index: SparseIndex, client: AsyncClient) -> Self {
         Self { index, client }
-    }
-
-    /// Splits into the component parts
-    #[inline]
-    pub fn into_parts(self) -> (SparseIndex, AsyncClient) {
-        (self.index, self.client)
     }
 
     /// Async version of [`RemoteSparseIndex::krate`]
