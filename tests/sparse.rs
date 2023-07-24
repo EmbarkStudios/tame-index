@@ -40,7 +40,7 @@ fn make_request_without_cache() {
 
     assert_eq!(hdrs.get("cargo-protocol").unwrap(), "version=1");
     assert_eq!(hdrs.get(header::ACCEPT).unwrap(), "text/plain");
-    assert_eq!(hdrs.get(header::ACCEPT_ENCODING).unwrap(), "gzip,identity");
+    assert_eq!(hdrs.get(header::ACCEPT_ENCODING).unwrap(), "gzip");
 }
 
 const ETAG: &str = "W/\"fa62f662c9aae1f21cab393950d4ae23\"";
