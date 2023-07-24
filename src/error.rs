@@ -2,6 +2,8 @@
 
 #[cfg(feature = "git")]
 pub use crate::index::git_remote::GitError;
+#[cfg(feature = "local")]
+pub use crate::index::local::LocalRegistryError;
 
 /// The core error type for this library
 #[derive(Debug, thiserror::Error)]
@@ -44,6 +46,10 @@ pub enum Error {
     /// Failed to parse a semver version or requirement
     #[error(transparent)]
     Semver(#[from] semver::Error),
+    /// A local registry is invalid
+    #[cfg(feature = "local")]
+    #[error(transparent)]
+    Local(#[from] LocalRegistryError),
 }
 
 impl From<std::path::PathBuf> for Error {
@@ -159,7 +165,7 @@ pub enum CacheError {
 #[derive(Debug, thiserror::Error)]
 pub enum HttpError {
     /// A [`reqwest::Error`]
-    #[cfg(feature = "sparse")]
+    #[cfg(any(feature = "sparse", feature = "local-builder"))]
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
     /// A status code was received that indicates user error, or possibly a

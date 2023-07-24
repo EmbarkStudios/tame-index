@@ -1,3 +1,5 @@
+#[cfg(feature = "local")]
+use crate::index::LocalRegistry;
 use crate::{
     index::{RemoteGitIndex, RemoteSparseIndex},
     Error, IndexKrate, KrateName,
@@ -10,11 +12,17 @@ pub enum ComboIndex {
     Git(RemoteGitIndex),
     /// An HTTP sparse index
     Sparse(RemoteSparseIndex),
+    /// A local registry
+    #[cfg(feature = "local")]
+    Local(LocalRegistry),
 }
 
 impl ComboIndex {
     /// Retrieves the index metadata for the specified crate name, optionally
     /// writing a cache entry for it if there was not already an up to date one
+    ///
+    /// Note no cache entry is written if this is a `Local` registry as they do
+    /// not use .cache files
     #[inline]
     pub fn krate(
         &self,
@@ -24,6 +32,8 @@ impl ComboIndex {
         match self {
             Self::Git(index) => index.krate(name, write_cache_entry),
             Self::Sparse(index) => index.krate(name, write_cache_entry),
+            #[cfg(feature = "local")]
+            Self::Local(lr) => lr.cached_krate(name),
         }
     }
 
@@ -33,6 +43,8 @@ impl ComboIndex {
         match self {
             Self::Git(index) => index.cached_krate(name),
             Self::Sparse(index) => index.cached_krate(name),
+            #[cfg(feature = "local")]
+            Self::Local(lr) => lr.cached_krate(name),
         }
     }
 }
@@ -48,5 +60,13 @@ impl From<RemoteSparseIndex> for ComboIndex {
     #[inline]
     fn from(index: RemoteSparseIndex) -> Self {
         Self::Sparse(index)
+    }
+}
+
+#[cfg(feature = "local")]
+impl From<LocalRegistry> for ComboIndex {
+    #[inline]
+    fn from(local: LocalRegistry) -> Self {
+        Self::Local(local)
     }
 }

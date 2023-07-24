@@ -388,6 +388,62 @@ impl fmt::Display for Chksum {
     }
 }
 
+/// Errors that can occur parsing a sha-256 hex string
+#[derive(Debug)]
+pub enum ChksumParseError {
+    /// The checksum string had an invalid length
+    InvalidLength(usize),
+    /// The checksum string contained a non-hex character
+    InvalidValue(char),
+}
+
+impl std::error::Error for ChksumParseError {}
+
+impl fmt::Display for ChksumParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLength(len) => {
+                write!(f, "expected string with length 64 but got length {len}")
+            }
+            Self::InvalidValue(c) => write!(f, "encountered non-hex character '{c}'"),
+        }
+    }
+}
+
+impl std::str::FromStr for Chksum {
+    type Err = ChksumParseError;
+
+    fn from_str(data: &str) -> Result<Self, Self::Err> {
+        if data.len() != 64 {
+            return Err(ChksumParseError::InvalidLength(data.len()));
+        }
+
+        let mut array = [0u8; 32];
+
+        for (ind, chunk) in data.as_bytes().chunks(2).enumerate() {
+            #[inline]
+            fn parse_hex(b: u8) -> Result<u8, ChksumParseError> {
+                Ok(match b {
+                    b'A'..=b'F' => b - b'A' + 10,
+                    b'a'..=b'f' => b - b'a' + 10,
+                    b'0'..=b'9' => b - b'0',
+                    c => {
+                        return Err(ChksumParseError::InvalidValue(c as char));
+                    }
+                })
+            }
+
+            let mut cur = parse_hex(chunk[0])?;
+            cur <<= 4;
+            cur |= parse_hex(chunk[1])?;
+
+            array[ind] = cur;
+        }
+
+        Ok(Self(array))
+    }
+}
+
 impl<'de> Deserialize<'de> for Chksum {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -404,39 +460,15 @@ impl<'de> Deserialize<'de> for Chksum {
             }
 
             fn visit_str<E: Error>(self, data: &str) -> Result<Self::Value, E> {
-                if data.len() != 64 {
-                    return Err(serde::de::Error::invalid_length(
-                        data.len(),
-                        &"a string with 64 characters",
-                    ));
-                }
-
-                let mut array = [0u8; 32];
-
-                for (ind, chunk) in data.as_bytes().chunks(2).enumerate() {
-                    #[inline]
-                    fn parse_hex<E: Error>(b: u8) -> Result<u8, E> {
-                        Ok(match b {
-                            b'A'..=b'F' => b - b'A' + 10,
-                            b'a'..=b'f' => b - b'a' + 10,
-                            b'0'..=b'9' => b - b'0',
-                            c => {
-                                return Err(Error::invalid_value(
-                                    serde::de::Unexpected::Char(c as char),
-                                    &"a hexadecimal character",
-                                ))
-                            }
-                        })
+                data.parse().map_err(|err| match err {
+                    ChksumParseError::InvalidLength(len) => {
+                        serde::de::Error::invalid_length(len, &"a string with 64 characters")
                     }
-
-                    let mut cur = parse_hex(chunk[0])?;
-                    cur <<= 4;
-                    cur |= parse_hex(chunk[1])?;
-
-                    array[ind] = cur;
-                }
-
-                Ok(Chksum(array))
+                    ChksumParseError::InvalidValue(c) => serde::de::Error::invalid_value(
+                        serde::de::Unexpected::Char(c),
+                        &"a hexadecimal character",
+                    ),
+                })
             }
 
             fn visit_borrowed_str<E: Error>(self, data: &'de str) -> Result<Self::Value, E> {

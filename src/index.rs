@@ -8,6 +8,8 @@ mod combo;
 pub mod git;
 #[cfg(feature = "git")]
 pub(crate) mod git_remote;
+#[cfg(feature = "local")]
+pub mod local;
 pub mod location;
 #[allow(missing_docs)]
 pub mod sparse;
@@ -20,10 +22,15 @@ pub use combo::ComboIndex;
 pub use git::GitIndex;
 #[cfg(feature = "git")]
 pub use git_remote::RemoteGitIndex;
+#[cfg(feature = "local")]
+pub use local::LocalRegistry;
 pub use location::{IndexLocation, IndexPath, IndexUrl};
 pub use sparse::SparseIndex;
 #[cfg(feature = "sparse")]
 pub use sparse_remote::{AsyncRemoteSparseIndex, RemoteSparseIndex};
+
+#[cfg(any(feature = "sparse", feature = "local-builder"))]
+pub use reqwest;
 
 /// Global configuration of an index, reflecting the [contents of config.json](https://doc.rust-lang.org/cargo/reference/registries.html#index-format).
 #[derive(Eq, PartialEq, PartialOrd, Ord, Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -40,38 +47,61 @@ impl IndexConfig {
     /// See <https://doc.rust-lang.org/cargo/reference/registries.html#index-format>
     /// for more info
     pub fn download_url(&self, name: crate::KrateName<'_>, version: &str) -> String {
+        // Special case crates.io which will easily be the most common case in
+        // almost all scenarios, we just use the _actual_ url directly, which
+        // avoids a 301 redirect, though obviously this will be bad if crates.io
+        // ever changes the redirect, this has been stable since 1.0 (at least)
+        // so it's unlikely to ever change, and if it does, it would be easy to
+        // update, though obviously would be broken on previously published versions
+        if self.dl == "https://crates.io/api/v1/crates" {
+            return format!("https://static.crates.io/crates/{name}/{name}-{version}.crate");
+        }
+
         let mut dl = self.dl.clone();
 
-        while let Some(start) = dl.find("{crate}") {
-            dl.replace_range(start..start + 7, name.0);
-        }
-
-        while let Some(start) = dl.find("{version}") {
-            dl.replace_range(start..start + 9, version);
-        }
-
-        if dl.contains("{prefix}") || dl.contains("{lowerprefix}") {
-            let mut prefix = String::with_capacity(6);
-            name.prefix(&mut prefix, '/');
-
-            while let Some(start) = dl.find("{prefix}") {
-                dl.replace_range(start..start + 8, &prefix);
+        if dl.contains('{') {
+            while let Some(start) = dl.find("{crate}") {
+                dl.replace_range(start..start + 7, name.0);
             }
 
-            if dl.contains("{lowerprefix}") {
-                prefix.make_ascii_lowercase();
+            while let Some(start) = dl.find("{version}") {
+                dl.replace_range(start..start + 9, version);
+            }
 
-                while let Some(start) = dl.find("{lowerprefix}") {
-                    dl.replace_range(start..start + 13, &prefix);
+            if dl.contains("{prefix}") || dl.contains("{lowerprefix}") {
+                let mut prefix = String::with_capacity(6);
+                name.prefix(&mut prefix, '/');
+
+                while let Some(start) = dl.find("{prefix}") {
+                    dl.replace_range(start..start + 8, &prefix);
+                }
+
+                if dl.contains("{lowerprefix}") {
+                    prefix.make_ascii_lowercase();
+
+                    while let Some(start) = dl.find("{lowerprefix}") {
+                        dl.replace_range(start..start + 13, &prefix);
+                    }
                 }
             }
+        } else {
+            // If none of the markers are present, then the value /{crate}/{version}/download is appended to the end
+            if !dl.ends_with('/') {
+                dl.push('/');
+            }
+
+            dl.push_str(name.0);
+            dl.push('/');
+            dl.push_str(version);
+            dl.push('/');
+            dl.push_str("download");
         }
 
         dl
     }
 }
 
-use crate::{Error, Path, PathBuf};
+use crate::Error;
 
 /// Provides simpler access to the cache for an index, regardless of the registry kind
 pub enum ComboIndexCache {
@@ -79,6 +109,9 @@ pub enum ComboIndexCache {
     Git(GitIndex),
     /// A sparse HTTP index
     Sparse(SparseIndex),
+    /// A local registry
+    #[cfg(feature = "local")]
+    Local(LocalRegistry),
 }
 
 impl ComboIndexCache {
@@ -92,6 +125,8 @@ impl ComboIndexCache {
         match self {
             Self::Git(index) => index.cached_krate(name),
             Self::Sparse(index) => index.cached_krate(name),
+            #[cfg(feature = "local")]
+            Self::Local(lr) => lr.cached_krate(name),
         }
     }
 
@@ -100,6 +135,13 @@ impl ComboIndexCache {
     /// See [`Self::crates_io`] if you want to create a crates.io index based
     /// upon other information in the user's environment
     pub fn new(il: IndexLocation<'_>) -> Result<Self, Error> {
+        #[cfg(feature = "local")]
+        {
+            if let IndexUrl::Local(path) = il.url {
+                return Ok(Self::Local(LocalRegistry::open(path.into(), true)?));
+            }
+        }
+
         let index = if il.url.is_sparse() {
             let sparse = SparseIndex::new(il)?;
             Self::Sparse(sparse)
@@ -109,108 +151,6 @@ impl ComboIndexCache {
         };
 
         Ok(index)
-    }
-
-    /// Opens the default index for crates.io, depending on the configuration and
-    /// version of cargo
-    ///
-    /// 1. Determines if the crates.io registry has been replaced
-    /// 2. Determines the protocol explicitly configured by the user
-    /// <https://doc.rust-lang.org/cargo/reference/config.html#registriescrates-ioprotocol>
-    /// 3. If not specified, detects the version of cargo (see
-    /// [`Self::cargo_version`]), and uses that to determine the appropriate default
-    pub fn crates_io(
-        config_root: Option<PathBuf>,
-        cargo_home: Option<PathBuf>,
-        cargo_version: Option<&str>,
-    ) -> Result<Self, Error> {
-        // If the crates.io registry has been replaced it doesn't matter what
-        // the protocol for it has been changed to
-        if let Some(replacement) =
-            get_crates_io_replacement(config_root.clone(), cargo_home.as_deref())?
-        {
-            let il = IndexLocation::new(IndexUrl::NonCratesIo(&replacement)).with_root(cargo_home);
-            return Self::new(il);
-        }
-
-        let sparse_index = match std::env::var("CARGO_REGISTRIES_CRATES_IO_PROTOCOL")
-            .ok()
-            .as_deref()
-        {
-            Some("sparse") => true,
-            Some("git") => false,
-            _ => {
-                let sparse_index =
-                    read_cargo_config(config_root, cargo_home.as_deref(), |config| {
-                        config
-                            .get("registries")
-                            .and_then(|v| v.get("crates-io"))
-                            .and_then(|v| v.get("protocol"))
-                            .and_then(|v| v.as_str())
-                            .and_then(|v| match v {
-                                "sparse" => Some(true),
-                                "git" => Some(false),
-                                _ => None,
-                            })
-                    })?;
-
-                if let Some(si) = sparse_index {
-                    si
-                } else {
-                    let semver = match cargo_version {
-                        Some(v) => std::borrow::Cow::Borrowed(v),
-                        None => Self::cargo_version()?.into(),
-                    };
-
-                    let vers: semver::Version = semver.parse()?;
-                    vers >= semver::Version::new(1, 70, 0)
-                }
-            }
-        };
-
-        Self::new(
-            IndexLocation::new(if sparse_index {
-                IndexUrl::CratesIoSparse
-            } else {
-                IndexUrl::CratesIoGit
-            })
-            .with_root(cargo_home),
-        )
-    }
-
-    /// Retrieves the current version of cargo being used
-    pub fn cargo_version() -> Result<String, Error> {
-        use std::io;
-
-        let mut cargo = std::process::Command::new(
-            std::env::var_os("CARGO")
-                .as_deref()
-                .unwrap_or(std::ffi::OsStr::new("cargo")),
-        );
-
-        cargo.arg("-V");
-        cargo.stdout(std::process::Stdio::piped());
-
-        let output = cargo.output()?;
-        if !output.status.success() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "failed to request cargo version information",
-            )
-            .into());
-        }
-
-        let stdout = String::from_utf8(output.stdout)
-            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
-
-        let semver = stdout.split(' ').nth(1).ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                "cargo version information was in an invalid format",
-            )
-        })?;
-
-        Ok(semver.to_owned())
     }
 }
 
@@ -228,105 +168,87 @@ impl From<GitIndex> for ComboIndexCache {
     }
 }
 
-/// Calls the specified function for each cargo config located according to
-/// cargo's standard hierarchical structure
-///
-/// Note that this only supports the use of `.cargo/config.toml`, which is not
-/// supported below cargo 1.39.0
-///
-/// See <https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure>
-pub(crate) fn read_cargo_config<T>(
-    root: Option<PathBuf>,
-    cargo_home: Option<&Path>,
-    callback: impl Fn(&toml::Value) -> Option<T>,
-) -> Result<Option<T>, Error> {
-    use std::borrow::Cow;
-
-    if let Some(mut path) = root.or_else(|| {
-        std::env::current_dir()
-            .ok()
-            .and_then(|pb| PathBuf::from_path_buf(pb).ok())
-    }) {
-        loop {
-            path.push(".cargo/config.toml");
-            if path.exists() {
-                let contents = match std::fs::read_to_string(&path) {
-                    Ok(c) => c,
-                    Err(err) => return Err(Error::IoPath(err, path)),
-                };
-
-                let toml: toml::Value = toml::from_str(&contents)?;
-                if let Some(value) = callback(&toml) {
-                    return Ok(Some(value));
-                }
-            }
-            path.pop();
-            path.pop();
-
-            // Walk up to the next potential config root
-            if !path.pop() {
-                break;
-            }
-        }
-    }
-
-    if let Some(home) = cargo_home
-        .map(Cow::Borrowed)
-        .or_else(|| crate::utils::cargo_home().ok().map(Cow::Owned))
-    {
-        let path = home.join("config.toml");
-        if path.exists() {
-            let toml: toml::Value =
-                toml::from_str(&std::fs::read_to_string(&path)?).map_err(Error::Toml)?;
-            if let Some(value) = callback(&toml) {
-                return Ok(Some(value));
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-/// Gets the url of a replacement registry for crates.io if one has been configured
-///
-/// See <https://doc.rust-lang.org/cargo/reference/source-replacement.html>
-#[inline]
-pub(crate) fn get_crates_io_replacement(
-    root: Option<PathBuf>,
-    cargo_home: Option<&Path>,
-) -> Result<Option<String>, Error> {
-    read_cargo_config(root, cargo_home, |config| {
-        config.get("source").and_then(|sources| {
-            sources
-                .get("crates-io")
-                .and_then(|v| v.get("replace-with"))
-                .and_then(|v| v.as_str())
-                .and_then(|v| sources.get(v))
-                .and_then(|v| v.get("registry"))
-                .and_then(|v| v.as_str().map(String::from))
-        })
-    })
-}
-
 #[cfg(test)]
 mod test {
-    use super::ComboIndexCache;
+    use super::IndexConfig;
+    use crate::kn;
 
-    // Current stable is 1.70.0, both these tests should pass
-
+    /// Validates we get the non-redirect url for crates.io downloads
     #[test]
-    fn gets_cargo_version() {
-        const MINIMUM: semver::Version = semver::Version::new(1, 70, 0);
-        let version: semver::Version = ComboIndexCache::cargo_version().unwrap().parse().unwrap();
-        assert!(version >= MINIMUM);
+    fn download_url_crates_io() {
+        let crates_io = IndexConfig {
+            dl: "https://crates.io/api/v1/crates".into(),
+            api: Some("https://crates.io".into()),
+        };
+
+        assert_eq!(
+            crates_io.download_url(kn!("a"), "1.0.0"),
+            "https://static.crates.io/crates/a/a-1.0.0.crate"
+        );
+        assert_eq!(
+            crates_io.download_url(kn!("aB"), "0.1.0"),
+            "https://static.crates.io/crates/aB/aB-0.1.0.crate"
+        );
+        assert_eq!(
+            crates_io.download_url(kn!("aBc"), "0.1.0"),
+            "https://static.crates.io/crates/aBc/aBc-0.1.0.crate"
+        );
+        assert_eq!(
+            crates_io.download_url(kn!("aBc-123"), "0.1.0"),
+            "https://static.crates.io/crates/aBc-123/aBc-123-0.1.0.crate"
+        );
     }
 
+    /// Validates we get a simple non-crates.io download
     #[test]
-    fn opens_sparse() {
-        assert!(std::env::var_os("CARGO_REGISTRIES_CRATES_IO_PROTOCOL").is_none());
-        assert!(matches!(
-            ComboIndexCache::crates_io(None, None, None).unwrap(),
-            ComboIndexCache::Sparse(_)
-        ));
+    fn download_url_non_crates_io() {
+        let ic = IndexConfig {
+            dl: "https://dl.cloudsmith.io/public/embark/deny/cargo/{crate}-{version}.crate".into(),
+            api: Some("https://cargo.cloudsmith.io/embark/deny".into()),
+        };
+
+        assert_eq!(
+            ic.download_url(kn!("a"), "1.0.0"),
+            "https://dl.cloudsmith.io/public/embark/deny/cargo/a-1.0.0.crate"
+        );
+        assert_eq!(
+            ic.download_url(kn!("aB"), "0.1.0"),
+            "https://dl.cloudsmith.io/public/embark/deny/cargo/aB-0.1.0.crate"
+        );
+        assert_eq!(
+            ic.download_url(kn!("aBc"), "0.1.0"),
+            "https://dl.cloudsmith.io/public/embark/deny/cargo/aBc-0.1.0.crate"
+        );
+        assert_eq!(
+            ic.download_url(kn!("aBc-123"), "0.1.0"),
+            "https://dl.cloudsmith.io/public/embark/deny/cargo/aBc-123-0.1.0.crate"
+        );
+    }
+
+    /// Validates we get a more complicated non-crates.io download, exercising all
+    /// of the possible replacement components
+    #[test]
+    fn download_url_complex() {
+        let ic = IndexConfig {
+            dl: "https://complex.io/ohhi/embark/rust/cargo/{lowerprefix}/{crate}/{crate}/{prefix}-{version}".into(),
+            api: None,
+        };
+
+        assert_eq!(
+            ic.download_url(kn!("a"), "1.0.0"),
+            "https://complex.io/ohhi/embark/rust/cargo/1/a/a/1-1.0.0"
+        );
+        assert_eq!(
+            ic.download_url(kn!("aB"), "0.1.0"),
+            "https://complex.io/ohhi/embark/rust/cargo/2/aB/aB/2-0.1.0"
+        );
+        assert_eq!(
+            ic.download_url(kn!("aBc"), "0.1.0"),
+            "https://complex.io/ohhi/embark/rust/cargo/3/a/aBc/aBc/3/a-0.1.0"
+        );
+        assert_eq!(
+            ic.download_url(kn!("aBc-123"), "0.1.0"),
+            "https://complex.io/ohhi/embark/rust/cargo/ab/c-/aBc-123/aBc-123/aB/c--0.1.0"
+        );
     }
 }

@@ -15,8 +15,13 @@ default = []
 git = ["dep:gix"]
 # Enables the built-in support for requesting index entries from a HTTP sparse registry index
 sparse = ["dep:reqwest"]
+# Enables local registry support
+local = ["dep:sha2", "dep:bytes"]
+# Enables helpers for building a local registry
+local-builder = ["local", "dep:reqwest"]
 
 [dependencies]
+bytes = { version = "1.4", optional = true }
 # All paths are assumed to be utf-8 for ease of use and implementation
 camino = "1.1"
 # Used to find the location of the local `CARGO_HOME`
@@ -30,6 +35,9 @@ semver = { version = "1.0", features = ["serde"] }
 # Serialization
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
+sha2 = { version = "0.10", optional = true, default-features = false, features = [
+    "std",
+] }
 # Smaller fixed size strings with heap fallback
 smol_str = { version = "0.2.0", features = ["serde"] }
 # Laziness
@@ -56,7 +64,12 @@ default-features = false
 features = ["blocking", "gzip", "rustls-tls"]
 
 [dev-dependencies]
+cargo_metadata = "0.17"
+rayon = "1.7"
 tempfile = "3.6"
 
 [package.metadata.docs.rs]
 all-features = true
+
+[profile.dev.package.sha2]
+opt-level = 3
