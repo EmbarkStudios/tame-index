@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use std::sync::Arc;
 pub use tame_index::{IndexKrate, Path, PathBuf};
 
 pub struct TempDir {
@@ -68,18 +67,7 @@ pub fn fake_krate(name: &str, num_versions: u8) -> IndexKrate {
             _ => unreachable!(),
         }
 
-        let iv = tame_index::IndexVersion {
-            name: name.into(),
-            version: version.clone(),
-            deps: Arc::new([]),
-            features: Arc::default(),
-            features2: None,
-            links: None,
-            rust_version: None,
-            checksum: tame_index::krate::Chksum(Default::default()),
-            yanked: false,
-        };
-
+        let iv = tame_index::IndexVersion::fake(name, version.clone());
         versions.push(iv);
     }
 

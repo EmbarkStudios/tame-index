@@ -26,12 +26,11 @@ pub struct IndexVersion {
     #[serde(rename = "cksum")]
     pub checksum: Chksum,
     /// [Features](https://doc.rust-lang.org/cargo/reference/features.html)
-    pub features: Arc<FeatureMap>,
-    /// It's wrapped in `Option<Box>` to reduce size of the struct when the field is unused (i.e. almost always)
+    features: Arc<FeatureMap>,
+    /// Version 2 of the index includes this field
     /// <https://rust-lang.github.io/rfcs/3143-cargo-weak-namespaced-features.html#index-changes>
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[allow(clippy::box_collection)]
-    pub features2: Option<Box<FeatureMap>>,
+    features2: Option<Arc<FeatureMap>>,
     /// Whether the crate is yanked from the remote index or not
     #[serde(default)]
     pub yanked: bool,
@@ -41,9 +40,29 @@ pub struct IndexVersion {
     /// [Rust Version](https://doc.rust-lang.org/cargo/reference/manifest.html#the-rust-version-field)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rust_version: Option<SmolStr>,
+    /// The index version, 1 if not set, v2 indicates presence of feature2 field
+    #[serde(skip_serializing_if = "Option::is_none")]
+    v: Option<u32>,
 }
 
 impl IndexVersion {
+    /// Test functionality
+    #[doc(hidden)]
+    pub fn fake(name: &str, version: Version) -> Self {
+        Self {
+            name: name.into(),
+            version,
+            deps: Arc::new([]),
+            features: Arc::default(),
+            features2: None,
+            links: None,
+            rust_version: None,
+            checksum: Chksum(Default::default()),
+            yanked: false,
+            v: None,
+        }
+    }
+
     /// Dependencies for this version
     #[inline]
     pub fn dependencies(&self) -> &[IndexDependency] {
@@ -58,13 +77,21 @@ impl IndexVersion {
         &self.checksum.0
     }
 
-    /// Explicit features this crate has. This list is not exhaustive,
-    /// because any optional dependency becomes a feature automatically.
+    /// Explicit feature set for this crate.
+    ///
+    /// This list is not exhaustive, because any optional dependency becomes a
+    /// feature automatically.
     ///
     /// `default` is a special feature name for implicitly enabled features.
     #[inline]
-    pub fn features(&self) -> &FeatureMap {
-        &self.features
+    pub fn features(&self) -> impl Iterator<Item = (&String, &Vec<String>)> {
+        self.features.iter().chain(
+            self.features2
+                .as_ref()
+                .map(|f| f.iter())
+                .into_iter()
+                .flatten(),
+        )
     }
 
     /// Exclusivity flag. If this is a sys crate, it informs it
@@ -113,9 +140,6 @@ pub struct IndexDependency {
     pub req: SmolStr,
     /// Double indirection to remove size from this struct, since the features are rarely set
     pub features: Box<Box<[String]>>,
-    /// The name of the actual crate, if it was renamed in the crate's manifest
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub package: Option<Box<SmolStr>>,
     /// If it is an optional dependency
     pub optional: bool,
     /// True if the default features are enabled
@@ -125,6 +149,9 @@ pub struct IndexDependency {
     /// The kind of the dependency
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kind: Option<DependencyKind>,
+    /// The name of the actual crate, if it was renamed in the crate's manifest
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub package: Option<Box<SmolStr>>,
 }
 
 impl IndexDependency {
@@ -301,17 +328,13 @@ impl IndexKrate {
         for line in split(bytes, b'\n') {
             let mut version: IndexVersion = serde_json::from_slice(line)?;
 
-            if let Some(features2) = version.features2.take() {
-                if let Some(f1) = Arc::get_mut(&mut version.features) {
-                    for (key, mut val) in features2.into_iter() {
-                        f1.entry(key).or_insert_with(Vec::new).append(&mut val);
-                    }
-                }
-            }
-
             // Many versions have identical dependencies and features
             dedupe.deps(&mut version.deps);
             dedupe.features(&mut version.features);
+
+            if let Some(features2) = &mut version.features2 {
+                dedupe.features(features2);
+            }
 
             versions.push(version);
         }
