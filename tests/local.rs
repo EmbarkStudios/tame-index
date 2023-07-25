@@ -28,6 +28,9 @@ fn builds_local_registry() {
     }
 
     for pkg in &md.packages {
+        if pkg.name == "tame-index" {
+            continue;
+        }
         let ip = krates.entry(pkg.name.clone()).or_insert_with(|| {
             let ik = sparse
                 .cached_krate(pkg.name.as_str().try_into().unwrap())
@@ -81,6 +84,11 @@ fn builds_local_registry() {
     std::fs::create_dir(&config).unwrap();
 
     config.push("config.toml");
+
+    // Windows is terrible
+    let local_path = lrb_td.path().as_str();
+    let local_path = local_path.replace('\\', "/");
+
     std::fs::write(
         &config,
         format!(
@@ -89,9 +97,7 @@ fn builds_local_registry() {
 replace-with = "test-registry"
 
 [source.test-registry]
-local-registry = "{}"
-"#,
-            lrb_td.path()
+local-registry = "{local_path}""#,
         ),
     )
     .unwrap();
