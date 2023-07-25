@@ -104,12 +104,8 @@ impl LocalRegistry {
             // Read the crate file from disk and verify its checksum matches
             let file =
                 std::fs::File::open(&path).map_err(|err| Error::IoPath(err, path.clone()))?;
-            if !validate_checksum::<{ 8 * 1024 }>(
-                &file,
-                &index_vers.checksum,
-                file.metadata().unwrap().len() as _,
-            )
-            .map_err(|err| Error::IoPath(err, path.clone()))?
+            if !validate_checksum::<{ 8 * 1024 }>(&file, &index_vers.checksum)
+                .map_err(|err| Error::IoPath(err, path.clone()))?
             {
                 return Err(LocalRegistryError::ChecksumMismatch {
                     name: crate_name.to_owned(),
@@ -262,14 +258,11 @@ impl<'iv> ValidKrate<'iv> {
 pub fn validate_checksum<const N: usize>(
     mut stream: impl std::io::Read,
     chksum: &crate::krate::Chksum,
-    expected: usize,
 ) -> Result<bool, std::io::Error> {
     use sha2::{Digest, Sha256};
 
     let mut buffer = [0u8; N];
     let mut hasher = Sha256::new();
-
-    let mut total = 0;
 
     loop {
         let read = stream.read(&mut buffer)?;
@@ -277,25 +270,10 @@ pub fn validate_checksum<const N: usize>(
             break;
         }
 
-        total += read;
         hasher.update(&buffer[..read]);
     }
 
-    assert_eq!(total, expected);
     let computed = hasher.finalize();
-
-    let mut hex1 = [0u8; 64];
-    let mut hex2 = [0u8; 64];
-
-    if computed.as_slice() != &chksum.0 {
-        let mut ugh = [0u8; 32];
-        ugh.copy_from_slice(computed.as_slice());
-        panic!(
-            "wtf {} != {} ({total})",
-            crate::utils::encode_hex(&ugh, &mut hex1),
-            crate::utils::encode_hex(&chksum.0, &mut hex2)
-        );
-    }
 
     Ok(computed.as_slice() == &chksum.0)
 }

@@ -129,7 +129,6 @@ fn downloads_and_verifies() {
         .unwrap();
 
     let body = res.bytes().unwrap();
-    let len = body.len();
 
     use bytes::Buf;
     assert!(local::validate_checksum::<{ 16 * 1024 }>(
@@ -137,7 +136,6 @@ fn downloads_and_verifies() {
         &("7706a72ab36d8cb1f80ffbf0e071533974a60d0a308d01a5d0375bf60499a342"
             .parse()
             .unwrap()),
-        len,
     )
     .unwrap());
 }
