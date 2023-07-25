@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.0] - 2023-07-25
 ### Added
 - [PR#3](https://github.com/EmbarkStudios/tame-index/pull/3) added support for [`Local Registry`](https://doc.rust-lang.org/cargo/reference/source-replacement.html#local-registry-sources)
 - [PR#3](https://github.com/EmbarkStudios/tame-index/pull/3) added [`LocalRegistry`] as an option for `ComboIndexCache`
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/EmbarkStudios/tame-index/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/EmbarkStudios/tame-index/compare/0.0.1...0.1.0
 [0.0.1]: https://github.com/EmbarkStudios/tame-index/releases/tag/0.0.1
