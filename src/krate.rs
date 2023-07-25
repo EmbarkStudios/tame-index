@@ -26,12 +26,11 @@ pub struct IndexVersion {
     #[serde(rename = "cksum")]
     pub checksum: Chksum,
     /// [Features](https://doc.rust-lang.org/cargo/reference/features.html)
-    pub features: Arc<FeatureMap>,
-    /// It's wrapped in `Option<Box>` to reduce size of the struct when the field is unused (i.e. almost always)
+    features: Arc<FeatureMap>,
+    /// Version 2 of the index includes this field
     /// <https://rust-lang.github.io/rfcs/3143-cargo-weak-namespaced-features.html#index-changes>
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[allow(clippy::box_collection)]
-    pub features2: Option<Box<FeatureMap>>,
+    features2: Option<Arc<FeatureMap>>,
     /// Whether the crate is yanked from the remote index or not
     #[serde(default)]
     pub yanked: bool,
@@ -41,9 +40,29 @@ pub struct IndexVersion {
     /// [Rust Version](https://doc.rust-lang.org/cargo/reference/manifest.html#the-rust-version-field)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rust_version: Option<SmolStr>,
+    /// The index version, 1 if not set, v2 indicates presence of feature2 field
+    #[serde(skip_serializing_if = "Option::is_none")]
+    v: Option<u32>,
 }
 
 impl IndexVersion {
+    /// Test functionality
+    #[doc(hidden)]
+    pub fn fake(name: &str, version: Version) -> Self {
+        Self {
+            name: name.into(),
+            version,
+            deps: Arc::new([]),
+            features: Arc::default(),
+            features2: None,
+            links: None,
+            rust_version: None,
+            checksum: Chksum(Default::default()),
+            yanked: false,
+            v: None,
+        }
+    }
+
     /// Dependencies for this version
     #[inline]
     pub fn dependencies(&self) -> &[IndexDependency] {
@@ -58,13 +77,21 @@ impl IndexVersion {
         &self.checksum.0
     }
 
-    /// Explicit features this crate has. This list is not exhaustive,
-    /// because any optional dependency becomes a feature automatically.
+    /// Explicit feature set for this crate.
+    ///
+    /// This list is not exhaustive, because any optional dependency becomes a
+    /// feature automatically.
     ///
     /// `default` is a special feature name for implicitly enabled features.
     #[inline]
-    pub fn features(&self) -> &FeatureMap {
-        &self.features
+    pub fn features(&self) -> impl Iterator<Item = (&String, &Vec<String>)> {
+        self.features.iter().chain(
+            self.features2
+                .as_ref()
+                .map(|f| f.iter())
+                .into_iter()
+                .flatten(),
+        )
     }
 
     /// Exclusivity flag. If this is a sys crate, it informs it
@@ -113,9 +140,6 @@ pub struct IndexDependency {
     pub req: SmolStr,
     /// Double indirection to remove size from this struct, since the features are rarely set
     pub features: Box<Box<[String]>>,
-    /// The name of the actual crate, if it was renamed in the crate's manifest
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub package: Option<Box<SmolStr>>,
     /// If it is an optional dependency
     pub optional: bool,
     /// True if the default features are enabled
@@ -125,6 +149,9 @@ pub struct IndexDependency {
     /// The kind of the dependency
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kind: Option<DependencyKind>,
+    /// The name of the actual crate, if it was renamed in the crate's manifest
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub package: Option<Box<SmolStr>>,
 }
 
 impl IndexDependency {
@@ -301,17 +328,13 @@ impl IndexKrate {
         for line in split(bytes, b'\n') {
             let mut version: IndexVersion = serde_json::from_slice(line)?;
 
-            if let Some(features2) = version.features2.take() {
-                if let Some(f1) = Arc::get_mut(&mut version.features) {
-                    for (key, mut val) in features2.into_iter() {
-                        f1.entry(key).or_insert_with(Vec::new).append(&mut val);
-                    }
-                }
-            }
-
             // Many versions have identical dependencies and features
             dedupe.deps(&mut version.deps);
             dedupe.features(&mut version.features);
+
+            if let Some(features2) = &mut version.features2 {
+                dedupe.features(features2);
+            }
 
             versions.push(version);
         }
@@ -365,6 +388,62 @@ impl fmt::Display for Chksum {
     }
 }
 
+/// Errors that can occur parsing a sha-256 hex string
+#[derive(Debug)]
+pub enum ChksumParseError {
+    /// The checksum string had an invalid length
+    InvalidLength(usize),
+    /// The checksum string contained a non-hex character
+    InvalidValue(char),
+}
+
+impl std::error::Error for ChksumParseError {}
+
+impl fmt::Display for ChksumParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLength(len) => {
+                write!(f, "expected string with length 64 but got length {len}")
+            }
+            Self::InvalidValue(c) => write!(f, "encountered non-hex character '{c}'"),
+        }
+    }
+}
+
+impl std::str::FromStr for Chksum {
+    type Err = ChksumParseError;
+
+    fn from_str(data: &str) -> Result<Self, Self::Err> {
+        if data.len() != 64 {
+            return Err(ChksumParseError::InvalidLength(data.len()));
+        }
+
+        let mut array = [0u8; 32];
+
+        for (ind, chunk) in data.as_bytes().chunks(2).enumerate() {
+            #[inline]
+            fn parse_hex(b: u8) -> Result<u8, ChksumParseError> {
+                Ok(match b {
+                    b'A'..=b'F' => b - b'A' + 10,
+                    b'a'..=b'f' => b - b'a' + 10,
+                    b'0'..=b'9' => b - b'0',
+                    c => {
+                        return Err(ChksumParseError::InvalidValue(c as char));
+                    }
+                })
+            }
+
+            let mut cur = parse_hex(chunk[0])?;
+            cur <<= 4;
+            cur |= parse_hex(chunk[1])?;
+
+            array[ind] = cur;
+        }
+
+        Ok(Self(array))
+    }
+}
+
 impl<'de> Deserialize<'de> for Chksum {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -381,39 +460,15 @@ impl<'de> Deserialize<'de> for Chksum {
             }
 
             fn visit_str<E: Error>(self, data: &str) -> Result<Self::Value, E> {
-                if data.len() != 64 {
-                    return Err(serde::de::Error::invalid_length(
-                        data.len(),
-                        &"a string with 64 characters",
-                    ));
-                }
-
-                let mut array = [0u8; 32];
-
-                for (ind, chunk) in data.as_bytes().chunks(2).enumerate() {
-                    #[inline]
-                    fn parse_hex<E: Error>(b: u8) -> Result<u8, E> {
-                        Ok(match b {
-                            b'A'..=b'F' => b - b'A' + 10,
-                            b'a'..=b'f' => b - b'a' + 10,
-                            b'0'..=b'9' => b - b'0',
-                            c => {
-                                return Err(Error::invalid_value(
-                                    serde::de::Unexpected::Char(c as char),
-                                    &"a hexadecimal character",
-                                ))
-                            }
-                        })
+                data.parse().map_err(|err| match err {
+                    ChksumParseError::InvalidLength(len) => {
+                        serde::de::Error::invalid_length(len, &"a string with 64 characters")
                     }
-
-                    let mut cur = parse_hex(chunk[0])?;
-                    cur <<= 4;
-                    cur |= parse_hex(chunk[1])?;
-
-                    array[ind] = cur;
-                }
-
-                Ok(Chksum(array))
+                    ChksumParseError::InvalidValue(c) => serde::de::Error::invalid_value(
+                        serde::de::Unexpected::Char(c),
+                        &"a hexadecimal character",
+                    ),
+                })
             }
 
             fn visit_borrowed_str<E: Error>(self, data: &'de str) -> Result<Self::Value, E> {

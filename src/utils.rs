@@ -148,8 +148,7 @@ pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
         // for repos with the same name, but different org/user owners
         let mut dir_name = canonical
             .split('/')
-            .rev()
-            .next()
+            .next_back()
             .unwrap_or("_empty")
             .to_owned();
 
@@ -210,6 +209,46 @@ pub fn get_index_details(url: &str, root: Option<PathBuf>) -> Result<(PathBuf, S
     path.push(url_dir.dir_name);
 
     Ok((path, url_dir.canonical))
+}
+
+/// Retrieves the current version of cargo being used
+pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<String, Error> {
+    use std::io;
+
+    let mut cargo = std::process::Command::new(
+        std::env::var_os("CARGO")
+            .as_deref()
+            .unwrap_or(std::ffi::OsStr::new("cargo")),
+    );
+
+    cargo.arg("-V");
+
+    if let Some(wd) = working_dir {
+        cargo.current_dir(wd);
+    }
+
+    cargo.stdout(std::process::Stdio::piped());
+
+    let output = cargo.output()?;
+    if !output.status.success() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            "failed to request cargo version information",
+        )
+        .into());
+    }
+
+    let stdout = String::from_utf8(output.stdout)
+        .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+
+    let semver = stdout.split(' ').nth(1).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "cargo version information was in an invalid format",
+        )
+    })?;
+
+    Ok(semver.to_owned())
 }
 
 #[cfg(test)]
@@ -290,5 +329,12 @@ mod test {
             url_to_local_dir(FAKE_REGISTRY).unwrap().dir_name,
             "github.com-a946fc29ac602819"
         );
+    }
+
+    #[test]
+    fn gets_cargo_version() {
+        const MINIMUM: semver::Version = semver::Version::new(1, 70, 0);
+        let version: semver::Version = super::cargo_version(None).unwrap().parse().unwrap();
+        assert!(version >= MINIMUM);
     }
 }

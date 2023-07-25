@@ -23,6 +23,14 @@ impl RemoteGitIndex {
         Self::with_options(index, gix::progress::Discard, &AtomicBool::default())
     }
 
+    /// Breaks [`Self`] into its component parts
+    ///
+    /// This method is useful if you need thread safe access to the repository
+    #[inline]
+    pub fn into_parts(self) -> (GitIndex, gix::Repository) {
+        (self.index, self.repo)
+    }
+
     /// Creates a new [`Self`] that allows showing of progress of the the potential
     /// fetch if the disk location is empty, as well as allowing interruption
     /// of the fetch operation
@@ -40,11 +48,12 @@ impl RemoteGitIndex {
                 Ok(repo) => Ok(repo),
                 Err(gix::open::Error::NotARepository { .. }) => {
                     let (repo, _out) =
-                        gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)?
+                        gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
+                            .map_err(Box::new)?
                             .fetch_only(progress, should_interrupt)?;
                     Ok(repo)
                 }
-                Err(err) => Err(err.into()),
+                Err(err) => Err(Box::new(err).into()),
             }
         };
 
@@ -65,6 +74,19 @@ impl RemoteGitIndex {
     #[inline]
     pub fn local(&self) -> &GitIndex {
         &self.index
+    }
+
+    /// Get the configuration of the index.
+    ///
+    /// See the [cargo docs](https://doc.rust-lang.org/cargo/reference/registry-index.html#index-configuration)
+    pub fn index_config(&self) -> Result<super::IndexConfig, Error> {
+        let blob = self.read_blob("config.json")?.ok_or_else(|| {
+            Error::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "unable to find config.json",
+            ))
+        })?;
+        Ok(serde_json::from_slice(&blob.data)?)
     }
 
     /// Sets the head commit in the wrapped index so that cache entries can be
@@ -96,40 +118,73 @@ impl RemoteGitIndex {
             return Ok(Some(cached));
         }
 
-        let get_blob = || -> Result<Option<Vec<u8>>, GitError> {
-            let tree = self.repo.head_commit()?.tree()?;
-            let relative_path = name.relative_path(None);
+        let Some(blob) = self.read_blob(&name.relative_path(None))? else { return Ok(None) };
 
-            let Some(entry) = tree.lookup_entry_by_path(&relative_path).map_err(GitError::BlobLookup)? else { return Ok(None) };
-            let blob = entry.object().map_err(GitError::BlobLookup)?;
-
-            // Sanity check this is a blob, it _shouldn't_ be possible to get anything
-            // else (like a subtree), but better safe than sorry
-            if blob.kind != gix::object::Kind::Blob {
-                return Ok(None);
-            }
-
-            let blob = blob.detach();
-
-            Ok(Some(blob.data))
-        };
-
-        let Some(blob) = get_blob()? else { return Ok(None) };
-
-        let krate = IndexKrate::from_slice(&blob)?;
+        let krate = IndexKrate::from_slice(&blob.data)?;
         if write_cache_entry {
             // It's unfortunate if fail to write to the cache, but we still were
             // able to retrieve the contents from git
-            let _ = self.index.write_to_cache(&krate);
+            let mut hex_id = [0u8; 40];
+            let gix::ObjectId::Sha1(sha1) = blob.id;
+            let blob_id = crate::utils::encode_hex(&sha1, &mut hex_id);
+
+            let _ = self.index.write_to_cache(&krate, Some(blob_id));
         }
 
         Ok(Some(krate))
     }
 
+    fn read_blob(&self, path: &str) -> Result<Option<gix::ObjectDetached>, GitError> {
+        let tree = self.repo.head_commit()?.tree()?;
+
+        let mut buf = Vec::new();
+        let Some(entry) = tree.lookup_entry_by_path(path, &mut buf).map_err(|err| GitError::BlobLookup(Box::new(err)))? else { return Ok(None) };
+        let blob = entry
+            .object()
+            .map_err(|err| GitError::BlobLookup(Box::new(err)))?;
+
+        // Sanity check this is a blob, it _shouldn't_ be possible to get anything
+        // else (like a subtree), but better safe than sorry
+        if blob.kind != gix::object::Kind::Blob {
+            return Ok(None);
+        }
+
+        Ok(Some(blob.detach()))
+    }
+
     /// Attempts to read the locally cached crate information
+    ///
+    /// Note this method has improvements over using [`GitIndex::cached_krate`].
+    ///
+    /// In older versions of cargo, only the head commit hash is used as the version
+    /// for cached crates, which means a fetch invalidates _all_ cached crates,
+    /// even if they have not been modified in any commits since the previous
+    /// fetch.
+    ///
+    /// This method does the same thing as cargo, which is to allow _either_
+    /// the head commit oid _or_ the blob oid as a version, which is more
+    /// granular and means the cached crate can remain valid as long as it is
+    /// not updated in a subsequent fetch. [`GitIndex::cached_krate`] cannot take
+    /// advantage of that though as it does not have access to git and thus
+    /// cannot know the blob id.
     #[inline]
     pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
-        self.index.cached_krate(name)
+        let Some(cached) = self.index.cache.read_cache_file(name)? else { return Ok(None) };
+        let valid = crate::index::cache::ValidCacheEntry::read(&cached)?;
+
+        if Some(valid.revision) != self.index.head_commit() {
+            let Some(blob) = self.read_blob(&name.relative_path(None))? else { return Ok(None) };
+
+            let mut hex_id = [0u8; 40];
+            let gix::ObjectId::Sha1(sha1) = blob.id;
+            let blob_id = crate::utils::encode_hex(&sha1, &mut hex_id);
+
+            if valid.revision != blob_id {
+                return Ok(None);
+            }
+        }
+
+        valid.to_krate(None)
     }
 
     /// Performs a fetch from the remote index repository.
@@ -166,13 +221,14 @@ impl RemoteGitIndex {
                 remote
             } else {
                 self.repo
-                    .head()?
+                    .head()
+                    .map_err(Box::new)?
                     .into_remote(DIR)
-                    .map(|r| r.map_err(GitError::RemoteLookup))
+                    .map(|r| r.map_err(|e| GitError::RemoteLookup(Box::new(e))))
                     .or_else(|| {
                         self.repo
                             .find_default_remote(DIR)
-                            .map(|r| r.map_err(GitError::RemoteLookup))
+                            .map(|r| r.map_err(|e| GitError::RemoteLookup(Box::new(e))))
                     })
                     .unwrap_or_else(|| Err(GitError::UnknownRemote))?
             };
@@ -188,8 +244,10 @@ impl RemoteGitIndex {
 
             // Perform the actual fetch
             let fetch_response: gix::remote::fetch::Outcome = remote
-                .connect(DIR)?
-                .prepare_fetch(&mut progress, Default::default())?
+                .connect(DIR)
+                .map_err(Box::new)?
+                .prepare_fetch(&mut progress, Default::default())
+                .map_err(Box::new)?
                 .receive(&mut progress, should_interrupt)?;
 
             // Find the commit id of the remote's HEAD
@@ -216,7 +274,7 @@ impl RemoteGitIndex {
             // we update it to the new commit id, otherwise we just set HEAD
             // directly
             use gix::head::Kind;
-            let edit = match self.repo.head()?.kind {
+            let edit = match self.repo.head().map_err(Box::new)?.kind {
                 Kind::Symbolic(sref) => {
                     // Update our local HEAD to the remote HEAD
                     if let Target::Symbolic(name) = sref.target {
@@ -276,17 +334,17 @@ impl RemoteGitIndex {
 #[allow(missing_docs)]
 pub enum GitError {
     #[error(transparent)]
-    ClonePrep(#[from] gix::clone::Error),
+    ClonePrep(#[from] Box<gix::clone::Error>),
     #[error(transparent)]
     CloneFetch(#[from] gix::clone::fetch::Error),
     #[error(transparent)]
-    Connect(#[from] gix::remote::connect::Error),
+    Connect(#[from] Box<gix::remote::connect::Error>),
     #[error(transparent)]
-    FetchPrep(#[from] gix::remote::fetch::prepare::Error),
+    FetchPrep(#[from] Box<gix::remote::fetch::prepare::Error>),
     #[error(transparent)]
     Fetch(#[from] gix::remote::fetch::Error),
     #[error(transparent)]
-    Open(#[from] gix::open::Error),
+    Open(#[from] Box<gix::open::Error>),
     #[error(transparent)]
     Peel(#[from] gix::reference::peel::Error),
     #[error(transparent)]
@@ -296,11 +354,11 @@ pub enum GitError {
     #[error(transparent)]
     Commit(#[from] gix::object::commit::Error),
     #[error(transparent)]
-    ReferenceLookup(#[from] gix::reference::find::existing::Error),
+    ReferenceLookup(#[from] Box<gix::reference::find::existing::Error>),
     #[error(transparent)]
-    BlobLookup(#[from] gix::odb::find::existing::Error<gix::odb::store::find::Error>),
+    BlobLookup(#[from] Box<gix::odb::find::existing::Error<gix::odb::store::find::Error>>),
     #[error(transparent)]
-    RemoteLookup(#[from] gix::remote::find::existing::Error),
+    RemoteLookup(#[from] Box<gix::remote::find::existing::Error>),
     #[error("unable to determine a suitable remote")]
     UnknownRemote,
     #[error("unable to locate remote HEAD")]

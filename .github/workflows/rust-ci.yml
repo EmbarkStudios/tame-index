@@ -25,14 +25,14 @@ jobs:
       # run clippy to verify we have no warnings
       - run: cargo fetch
       - name: cargo clippy
-        run: cargo clippy --all-targets --features git,sparse -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
     name: Test
     strategy:
       matrix:
         os: [ubuntu-22.04, windows-2022]
-        features: ["--features git", "--features sparse", null]
+        features: ["--features git", "--features sparse", "--features local-builder,sparse"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3

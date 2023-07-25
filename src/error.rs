@@ -2,6 +2,8 @@
 
 #[cfg(feature = "git")]
 pub use crate::index::git_remote::GitError;
+#[cfg(feature = "local")]
+pub use crate::index::local::LocalRegistryError;
 
 /// The core error type for this library
 #[derive(Debug, thiserror::Error)]
@@ -13,22 +15,15 @@ pub enum Error {
     /// was not valid utf-8
     #[error("unable to use non-utf8 path {:?}", .0)]
     NonUtf8Path(std::path::PathBuf),
+    /// A user-provided string was not a valid crate name
+    #[error(transparent)]
+    InvalidKrateName(#[from] InvalidKrateName),
     /// An I/O error
     #[error(transparent)]
     Io(#[from] std::io::Error),
     /// An I/O error occurred trying to access a specific path
     #[error("I/O operation failed for path '{}'", .1)]
     IoPath(#[source] std::io::Error, crate::PathBuf),
-    /// Crate names must not be empty
-    #[error("crate names are not allowed to be empty")]
-    EmptyCrateName,
-    /// Crates names must be ASCII.
-    ///
-    /// Note this is a rule enforced by crates.io, but not cargo itself. Please
-    /// file an issue if you use a non-crates.io registry that does allow such
-    /// non-ASCII crate names
-    #[error("crate names may only contain ASCII characters")]
-    NonAsciiCrateName,
     /// A user provided URL was invalid
     #[error(transparent)]
     InvalidUrl(#[from] InvalidUrl),
@@ -51,12 +46,64 @@ pub enum Error {
     /// Failed to parse a semver version or requirement
     #[error(transparent)]
     Semver(#[from] semver::Error),
+    /// A local registry is invalid
+    #[cfg(feature = "local")]
+    #[error(transparent)]
+    Local(#[from] LocalRegistryError),
 }
 
 impl From<std::path::PathBuf> for Error {
     fn from(p: std::path::PathBuf) -> Self {
         Self::NonUtf8Path(p)
     }
+}
+
+/// Various kinds of reserved names disallowed by cargo
+#[derive(Debug, Copy, Clone)]
+pub enum ReservedNameKind {
+    /// The name is a Rust keyword
+    Keyword,
+    /// The name conflicts with a cargo artifact directory
+    Artifact,
+    /// The name has a special meaning on Windows
+    Windows,
+    /// The name conflicts with a Rust std library name
+    Standard,
+}
+
+impl std::fmt::Display for ReservedNameKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Keyword => f.write_str("rustlang keyword"),
+            Self::Artifact => f.write_str("cargo artifact"),
+            Self::Windows => f.write_str("windows reserved"),
+            Self::Standard => f.write_str("rustlang std library"),
+        }
+    }
+}
+
+/// Errors that can occur when validating a crate name
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidKrateName {
+    /// The name had an invalid length
+    #[error("crate name had an invalid length of '{0}'")]
+    InvalidLength(usize),
+    /// The name contained an invalid character
+    #[error("invalid character '{invalid}` @ {index}")]
+    InvalidCharacter {
+        /// The invalid character
+        invalid: char,
+        /// The index of the character in the provided string
+        index: usize,
+    },
+    /// The name was one of the reserved names disallowed by cargo
+    #[error("the name '{reserved}' is reserved as '{kind}`")]
+    ReservedName {
+        /// The name that was reserved
+        reserved: &'static str,
+        /// The kind of the reserved name
+        kind: ReservedNameKind,
+    },
 }
 
 /// An error pertaining to a bad URL provided to the API
@@ -81,6 +128,9 @@ pub enum InvalidUrlError {
     /// Unable to find the `<scheme>://`
     #[error("the scheme is missing")]
     MissingScheme,
+    /// Attempted to construct a git index with a sparse URL
+    #[error("attempted to create a git index for a sparse URL")]
+    SparseForGit,
 }
 
 /// Errors related to a local index cache
@@ -115,7 +165,7 @@ pub enum CacheError {
 #[derive(Debug, thiserror::Error)]
 pub enum HttpError {
     /// A [`reqwest::Error`]
-    #[cfg(feature = "sparse")]
+    #[cfg(any(feature = "sparse", feature = "local-builder"))]
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
     /// A status code was received that indicates user error, or possibly a
