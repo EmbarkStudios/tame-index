@@ -35,6 +35,8 @@ If you still want to use this crate instead, there are some differences to be aw
 1. Local cache files are always supported regardless of features enabled
 1. Functionality for determining the local index location for a remote registry URL is exposed in the public API
 1. Functionality for writing cache entries to the local index cache is exposed in the public API
+1. [`Local Registry`](https://doc.rust-lang.org/cargo/reference/source-replacement.html#local-registry-sources) support is available behind the `local` feature flag
+1. Building of local registries is available behind the `local-builder` feature flag
 
 ## Contributing
 
