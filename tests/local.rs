@@ -61,7 +61,7 @@ fn builds_local_registry() {
                     .iter()
                     .find(|iv| iv.version == vers)
                     .unwrap();
-                local::ValidKrate::download(&client, &config, &iv).unwrap()
+                local::ValidKrate::download(&client, &config, iv).unwrap()
             })
             .collect_into_vec(&mut crate_files);
 
@@ -99,7 +99,7 @@ local-registry = "{}"
     // We also need to create a fake lib.rs otherwise cargo will be sad
     {
         let librs = fake_project.path().join("src/lib.rs");
-        std::fs::create_dir_all(&librs.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(librs.parent().unwrap()).unwrap();
         std::fs::write(librs, "").unwrap();
     }
 

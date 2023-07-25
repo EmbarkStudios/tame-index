@@ -48,11 +48,12 @@ impl RemoteGitIndex {
                 Ok(repo) => Ok(repo),
                 Err(gix::open::Error::NotARepository { .. }) => {
                     let (repo, _out) =
-                        gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)?
+                        gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
+                            .map_err(Box::new)?
                             .fetch_only(progress, should_interrupt)?;
                     Ok(repo)
                 }
-                Err(err) => Err(err.into()),
+                Err(err) => Err(Box::new(err).into()),
             }
         };
 
@@ -137,8 +138,10 @@ impl RemoteGitIndex {
         let tree = self.repo.head_commit()?.tree()?;
 
         let mut buf = Vec::new();
-        let Some(entry) = tree.lookup_entry_by_path(&path, &mut buf).map_err(GitError::BlobLookup)? else { return Ok(None) };
-        let blob = entry.object().map_err(GitError::BlobLookup)?;
+        let Some(entry) = tree.lookup_entry_by_path(path, &mut buf).map_err(|err| GitError::BlobLookup(Box::new(err)))? else { return Ok(None) };
+        let blob = entry
+            .object()
+            .map_err(|err| GitError::BlobLookup(Box::new(err)))?;
 
         // Sanity check this is a blob, it _shouldn't_ be possible to get anything
         // else (like a subtree), but better safe than sorry
@@ -218,13 +221,14 @@ impl RemoteGitIndex {
                 remote
             } else {
                 self.repo
-                    .head()?
+                    .head()
+                    .map_err(Box::new)?
                     .into_remote(DIR)
-                    .map(|r| r.map_err(GitError::RemoteLookup))
+                    .map(|r| r.map_err(|e| GitError::RemoteLookup(Box::new(e))))
                     .or_else(|| {
                         self.repo
                             .find_default_remote(DIR)
-                            .map(|r| r.map_err(GitError::RemoteLookup))
+                            .map(|r| r.map_err(|e| GitError::RemoteLookup(Box::new(e))))
                     })
                     .unwrap_or_else(|| Err(GitError::UnknownRemote))?
             };
@@ -240,8 +244,10 @@ impl RemoteGitIndex {
 
             // Perform the actual fetch
             let fetch_response: gix::remote::fetch::Outcome = remote
-                .connect(DIR)?
-                .prepare_fetch(&mut progress, Default::default())?
+                .connect(DIR)
+                .map_err(Box::new)?
+                .prepare_fetch(&mut progress, Default::default())
+                .map_err(Box::new)?
                 .receive(&mut progress, should_interrupt)?;
 
             // Find the commit id of the remote's HEAD
@@ -268,7 +274,7 @@ impl RemoteGitIndex {
             // we update it to the new commit id, otherwise we just set HEAD
             // directly
             use gix::head::Kind;
-            let edit = match self.repo.head()?.kind {
+            let edit = match self.repo.head().map_err(Box::new)?.kind {
                 Kind::Symbolic(sref) => {
                     // Update our local HEAD to the remote HEAD
                     if let Target::Symbolic(name) = sref.target {
@@ -328,17 +334,17 @@ impl RemoteGitIndex {
 #[allow(missing_docs)]
 pub enum GitError {
     #[error(transparent)]
-    ClonePrep(#[from] gix::clone::Error),
+    ClonePrep(#[from] Box<gix::clone::Error>),
     #[error(transparent)]
     CloneFetch(#[from] gix::clone::fetch::Error),
     #[error(transparent)]
-    Connect(#[from] gix::remote::connect::Error),
+    Connect(#[from] Box<gix::remote::connect::Error>),
     #[error(transparent)]
-    FetchPrep(#[from] gix::remote::fetch::prepare::Error),
+    FetchPrep(#[from] Box<gix::remote::fetch::prepare::Error>),
     #[error(transparent)]
     Fetch(#[from] gix::remote::fetch::Error),
     #[error(transparent)]
-    Open(#[from] gix::open::Error),
+    Open(#[from] Box<gix::open::Error>),
     #[error(transparent)]
     Peel(#[from] gix::reference::peel::Error),
     #[error(transparent)]
@@ -348,11 +354,11 @@ pub enum GitError {
     #[error(transparent)]
     Commit(#[from] gix::object::commit::Error),
     #[error(transparent)]
-    ReferenceLookup(#[from] gix::reference::find::existing::Error),
+    ReferenceLookup(#[from] Box<gix::reference::find::existing::Error>),
     #[error(transparent)]
-    BlobLookup(#[from] gix::odb::find::existing::Error<gix::odb::store::find::Error>),
+    BlobLookup(#[from] Box<gix::odb::find::existing::Error<gix::odb::store::find::Error>>),
     #[error(transparent)]
-    RemoteLookup(#[from] gix::remote::find::existing::Error),
+    RemoteLookup(#[from] Box<gix::remote::find::existing::Error>),
     #[error("unable to determine a suitable remote")]
     UnknownRemote,
     #[error("unable to locate remote HEAD")]

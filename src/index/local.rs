@@ -75,20 +75,19 @@ impl LocalRegistry {
             let Some(fname) = path.file_name() else { continue; };
             let Some((crate_name, version)) = crate_file_components(fname) else { continue; };
 
-            let index_entry = match indexed.get(crate_name) {
-                Some(ie) => ie,
-                None => {
-                    let krate_name: crate::KrateName<'_> = crate_name.try_into()?;
-                    let path = index_root.join(krate_name.relative_path(None));
+            let index_entry = if let Some(ie) = indexed.get(crate_name) {
+                ie
+            } else {
+                let krate_name: crate::KrateName<'_> = crate_name.try_into()?;
+                let path = index_root.join(krate_name.relative_path(None));
 
-                    let index_contents =
-                        std::fs::read(&path).map_err(|err| Error::IoPath(err, path.clone()))?;
-                    let ik = IndexKrate::from_slice(&index_contents)?;
+                let index_contents =
+                    std::fs::read(&path).map_err(|err| Error::IoPath(err, path.clone()))?;
+                let ik = IndexKrate::from_slice(&index_contents)?;
 
-                    indexed.insert(crate_name.to_owned(), ik);
+                indexed.insert(crate_name.to_owned(), ik);
 
-                    indexed.get(crate_name).unwrap()
-                }
+                indexed.get(crate_name).unwrap()
             };
 
             let version = version.parse()?;
@@ -275,7 +274,7 @@ pub fn validate_checksum<const N: usize>(
 
     let computed = hasher.finalize();
 
-    Ok(computed.as_slice() == &chksum.0)
+    Ok(computed.as_slice() == chksum.0)
 }
 
 /// Splits a crate package name into its component parts
