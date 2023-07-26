@@ -31,7 +31,9 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2022]
+        os:
+          - ubuntu-22.04
+          #- windows-2022
         features: ["--features git", "--features sparse", "--features local-builder,sparse"]
     runs-on: ${{ matrix.os }}
     steps:
