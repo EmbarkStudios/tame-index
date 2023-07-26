@@ -15,3 +15,12 @@ pub use index::{
 };
 pub use krate::{IndexDependency, IndexKrate, IndexVersion};
 pub use krate_name::KrateName;
+
+/// Reexports of some crates for easier downstream usage without requiring adding
+/// your own dependencies
+pub mod external {
+    #[cfg(feature = "git")]
+    pub use gix;
+    #[cfg(any(feature = "sparse", feature = "local-builder"))]
+    pub use reqwest;
+}
