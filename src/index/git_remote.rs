@@ -9,8 +9,9 @@ use std::sync::atomic::AtomicBool;
 pub struct RemoteGitIndex {
     index: GitIndex,
     repo: gix::Repository,
-    remote_name: Option<String>,
 }
+
+const DIR: gix::remote::Direction = gix::remote::Direction::Fetch;
 
 impl RemoteGitIndex {
     /// Creates a new [`Self`] that can access and write local cache entries,
@@ -20,7 +21,11 @@ impl RemoteGitIndex {
     /// provided [`GitIndex`], a full clone will be performed.
     #[inline]
     pub fn new(index: GitIndex) -> Result<Self, Error> {
-        Self::with_options(index, gix::progress::Discard, &AtomicBool::default())
+        Self::with_options(
+            index,
+            gix::progress::Discard,
+            &gix::interrupt::IS_INTERRUPTED,
+        )
     }
 
     /// Breaks [`Self`] into its component parts
@@ -44,30 +49,72 @@ impl RemoteGitIndex {
         P::SubProgress: 'static,
     {
         let open_or_clone_repo = || -> Result<_, GitError> {
-            match gix::open(&index.cache.path) {
-                Ok(repo) => Ok(repo),
-                Err(gix::open::Error::NotARepository { .. }) => {
-                    let (repo, _out) =
-                        gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
-                            .map_err(Box::new)?
-                            .fetch_only(progress, should_interrupt)?;
-                    Ok(repo)
-                }
-                Err(err) => Err(Box::new(err).into()),
-            }
+            let mut mapping = gix::sec::trust::Mapping::default();
+            let open_with_complete_config =
+                gix::open::Options::default().permissions(gix::open::Permissions {
+                    config: gix::open::permissions::Config {
+                        // Be sure to get all configuration, some of which is only known by the git binary.
+                        // That way we are sure to see all the systems credential helpers
+                        git_binary: true,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                });
+
+            mapping.reduced = open_with_complete_config.clone();
+            mapping.full = open_with_complete_config.clone();
+
+            let _lock = gix::lock::Marker::acquire_to_hold_resource(
+                index.cache.path.with_extension("tame-index"),
+                gix::lock::acquire::Fail::AfterDurationWithBackoff(std::time::Duration::from_secs(
+                    60 * 10, /* 10 minutes */
+                )),
+                Some(std::path::PathBuf::from_iter(Some(
+                    std::path::Component::RootDir,
+                ))),
+            )?;
+
+            // Attempt to open the repository, if it fails for any reason,
+            // attempt to perform a fresh clone instead
+            let repo = gix::ThreadSafeRepository::discover_opts(
+                &index.cache.path,
+                gix::discover::upwards::Options::default().apply_environment(),
+                mapping,
+            )
+            .ok()
+            .map(|repo| repo.to_thread_local())
+            .filter(|repo| {
+                // The `cargo` standard registry clone has no configured origin (when created with `git2`).
+                repo.find_remote("origin").map_or(true, |remote| {
+                    remote
+                        .url(DIR)
+                        .map_or(false, |remote_url| remote_url.to_bstring() == index.url)
+                })
+            })
+            .or_else(|| gix::open_opts(&index.cache.path, open_with_complete_config).ok());
+
+            let repo = if let Some(repo) = repo {
+                repo
+            } else {
+                let (repo, _out) = gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
+                    .map_err(Box::new)?
+                    .with_remote_name("origin")?
+                    .configure_remote(|remote| {
+                        Ok(remote.with_refspecs(["+HEAD:refs/remotes/origin/HEAD"], DIR)?)
+                    })
+                    .fetch_only(progress, should_interrupt)?;
+                repo
+            };
+
+            Ok(repo)
         };
 
         let mut repo = open_or_clone_repo()?;
         repo.object_cache_size_if_unset(4 * 1024 * 1024);
-        let remote_name = repo.remote_names().into_iter().next().map(String::from);
 
         Self::set_head(&mut index, &repo)?;
 
-        Ok(Self {
-            repo,
-            index,
-            remote_name,
-        })
+        Ok(Self { repo, index })
     }
 
     /// Gets the local index
@@ -206,38 +253,17 @@ impl RemoteGitIndex {
         P: gix::Progress,
         P::SubProgress: 'static,
     {
-        const DIR: gix::remote::Direction = gix::remote::Direction::Fetch;
-
         let mut perform_fetch = || -> Result<(), GitError> {
-            // Attempt to lookup the remote we _think_ we should use first,
-            // otherwise fallback to getting the remote for the current HEAD
-            let mut remote = if let Some(remote) = self
-                .remote_name
-                .as_deref()
-                .and_then(|name| self.repo.find_remote(name).ok())
-            {
-                remote
-            } else {
+            let mut remote = self.repo.find_remote("origin").ok().unwrap_or_else(|| {
                 self.repo
-                    .head()
-                    .map_err(Box::new)?
-                    .into_remote(DIR)
-                    .map(|r| r.map_err(|e| GitError::RemoteLookup(Box::new(e))))
-                    .or_else(|| {
-                        self.repo
-                            .find_default_remote(DIR)
-                            .map(|r| r.map_err(|e| GitError::RemoteLookup(Box::new(e))))
-                    })
-                    .unwrap_or_else(|| Err(GitError::UnknownRemote))?
-            };
+                    .remote_at(self.index.url.as_str())
+                    .expect("owned URL is always valid")
+            });
 
-            let remote_head = format!(
-                "refs/remotes/{}/HEAD",
-                self.remote_name.as_deref().unwrap_or("origin")
-            );
+            let remote_head = "refs/remotes/origin/HEAD";
 
             remote
-                .replace_refspecs(Some(format!("HEAD:{remote_head}").as_str()), DIR)
+                .replace_refspecs(Some(format!("+HEAD:{remote_head}").as_str()), DIR)
                 .expect("valid statically known refspec");
 
             // Perform the actual fetch
@@ -357,8 +383,10 @@ pub enum GitError {
     BlobLookup(#[from] Box<gix::odb::find::existing::Error<gix::odb::store::find::Error>>),
     #[error(transparent)]
     RemoteLookup(#[from] Box<gix::remote::find::existing::Error>),
-    #[error("unable to determine a suitable remote")]
-    UnknownRemote,
+    #[error(transparent)]
+    Lock(#[from] gix::lock::acquire::Error),
+    #[error(transparent)]
+    RemoteName(#[from] gix::remote::name::Error),
     #[error("unable to locate remote HEAD")]
     UnableToFindRemoteHead,
     #[error("unable to update HEAD to remote HEAD")]
