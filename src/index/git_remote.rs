@@ -9,8 +9,9 @@ use std::sync::atomic::AtomicBool;
 pub struct RemoteGitIndex {
     index: GitIndex,
     repo: gix::Repository,
-    remote_name: Option<String>,
 }
+
+const DIR: gix::remote::Direction = gix::remote::Direction::Fetch;
 
 impl RemoteGitIndex {
     /// Creates a new [`Self`] that can access and write local cache entries,
@@ -20,7 +21,11 @@ impl RemoteGitIndex {
     /// provided [`GitIndex`], a full clone will be performed.
     #[inline]
     pub fn new(index: GitIndex) -> Result<Self, Error> {
-        Self::with_options(index, gix::progress::Discard, &AtomicBool::default())
+        Self::with_options(
+            index,
+            gix::progress::Discard,
+            &gix::interrupt::IS_INTERRUPTED,
+        )
     }
 
     /// Breaks [`Self`] into its component parts
@@ -44,30 +49,72 @@ impl RemoteGitIndex {
         P::SubProgress: 'static,
     {
         let open_or_clone_repo = || -> Result<_, GitError> {
-            match gix::open(&index.cache.path) {
-                Ok(repo) => Ok(repo),
-                Err(gix::open::Error::NotARepository { .. }) => {
-                    let (repo, _out) =
-                        gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
-                            .map_err(Box::new)?
-                            .fetch_only(progress, should_interrupt)?;
-                    Ok(repo)
-                }
-                Err(err) => Err(Box::new(err).into()),
-            }
+            let mut mapping = gix::sec::trust::Mapping::default();
+            let open_with_complete_config =
+                gix::open::Options::default().permissions(gix::open::Permissions {
+                    config: gix::open::permissions::Config {
+                        // Be sure to get all configuration, some of which is only known by the git binary.
+                        // That way we are sure to see all the systems credential helpers
+                        git_binary: true,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                });
+
+            mapping.reduced = open_with_complete_config.clone();
+            mapping.full = open_with_complete_config.clone();
+
+            let _lock = gix::lock::Marker::acquire_to_hold_resource(
+                index.cache.path.with_extension("tame-index"),
+                gix::lock::acquire::Fail::AfterDurationWithBackoff(std::time::Duration::from_secs(
+                    60 * 10, /* 10 minutes */
+                )),
+                Some(std::path::PathBuf::from_iter(Some(
+                    std::path::Component::RootDir,
+                ))),
+            )?;
+
+            // Attempt to open the repository, if it fails for any reason,
+            // attempt to perform a fresh clone instead
+            let repo = gix::ThreadSafeRepository::discover_opts(
+                &index.cache.path,
+                gix::discover::upwards::Options::default().apply_environment(),
+                mapping,
+            )
+            .ok()
+            .map(|repo| repo.to_thread_local())
+            .filter(|repo| {
+                // The `cargo` standard registry clone has no configured origin (when created with `git2`).
+                repo.find_remote("origin").map_or(true, |remote| {
+                    remote
+                        .url(DIR)
+                        .map_or(false, |remote_url| remote_url.to_bstring() == index.url)
+                })
+            })
+            .or_else(|| gix::open_opts(&index.cache.path, open_with_complete_config).ok());
+
+            let repo = if let Some(repo) = repo {
+                repo
+            } else {
+                let (repo, _out) = gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
+                    .map_err(Box::new)?
+                    .with_remote_name("origin")?
+                    .configure_remote(|remote| {
+                        Ok(remote.with_refspecs(["+HEAD:refs/remotes/origin/HEAD"], DIR)?)
+                    })
+                    .fetch_only(progress, should_interrupt)?;
+                repo
+            };
+
+            Ok(repo)
         };
 
         let mut repo = open_or_clone_repo()?;
         repo.object_cache_size_if_unset(4 * 1024 * 1024);
-        let remote_name = repo.remote_names().into_iter().next().map(String::from);
 
         Self::set_head(&mut index, &repo)?;
 
-        Ok(Self {
-            repo,
-            index,
-            remote_name,
-        })
+        Ok(Self { repo, index })
     }
 
     /// Gets the local index
@@ -192,7 +239,7 @@ impl RemoteGitIndex {
     /// This method performs network I/O.
     #[inline]
     pub fn fetch(&mut self) -> Result<(), Error> {
-        self.fetch_with_options(gix::progress::Discard, &AtomicBool::default())
+        self.fetch_with_options(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)
     }
 
     /// Same as [`Self::fetch`] but allows specifying a progress implementation
@@ -206,38 +253,17 @@ impl RemoteGitIndex {
         P: gix::Progress,
         P::SubProgress: 'static,
     {
-        const DIR: gix::remote::Direction = gix::remote::Direction::Fetch;
-
         let mut perform_fetch = || -> Result<(), GitError> {
-            // Attempt to lookup the remote we _think_ we should use first,
-            // otherwise fallback to getting the remote for the current HEAD
-            let mut remote = if let Some(remote) = self
-                .remote_name
-                .as_deref()
-                .and_then(|name| self.repo.find_remote(name).ok())
-            {
-                remote
-            } else {
+            let mut remote = self.repo.find_remote("origin").ok().unwrap_or_else(|| {
                 self.repo
-                    .head()
-                    .map_err(Box::new)?
-                    .into_remote(DIR)
-                    .map(|r| r.map_err(|e| GitError::RemoteLookup(Box::new(e))))
-                    .or_else(|| {
-                        self.repo
-                            .find_default_remote(DIR)
-                            .map(|r| r.map_err(|e| GitError::RemoteLookup(Box::new(e))))
-                    })
-                    .unwrap_or_else(|| Err(GitError::UnknownRemote))?
-            };
+                    .remote_at(self.index.url.as_str())
+                    .expect("owned URL is always valid")
+            });
 
-            let remote_head = format!(
-                "refs/remotes/{}/HEAD",
-                self.remote_name.as_deref().unwrap_or("origin")
-            );
+            let remote_head = "refs/remotes/origin/HEAD";
 
             remote
-                .replace_refspecs(Some(format!("HEAD:{remote_head}").as_str()), DIR)
+                .replace_refspecs(Some(format!("+HEAD:{remote_head}").as_str()), DIR)
                 .expect("valid statically known refspec");
 
             // Perform the actual fetch
@@ -296,8 +322,23 @@ impl RemoteGitIndex {
                 Kind::Unborn(_) | Kind::Detached { .. } => None,
             };
 
-            self.repo
-                .edit_reference(edit.unwrap_or_else(|| tx::RefEdit {
+            // We're updating the reflog which requires a committer be set, which might
+            // not be the case, particular in a CI environment, but also would default
+            // to the git config for the current directory/global, which on a normal
+            // user machine would show the user was the one who updated the database which
+            // is kind of misleading, so we just override the config for this operation
+            {
+                let repo = {
+                    let mut config = self.repo.config_snapshot_mut();
+                    config.set_raw_value("committer", None, "name", "tame-index")?;
+                    // Note we _have_ to set the email as well, but luckily gix does not actually
+                    // validate if it's a proper email or not :)
+                    config.set_raw_value("committer", None, "email", "")?;
+
+                    config.commit_auto_rollback().map_err(Box::new)?
+                };
+
+                repo.edit_reference(edit.unwrap_or_else(|| tx::RefEdit {
                     change: tx::Change::Update {
                         log: tx::LogChange {
                             mode: tx::RefLog::AndReference,
@@ -310,6 +351,7 @@ impl RemoteGitIndex {
                     name: "HEAD".try_into().unwrap(),
                     deref: true,
                 }))?;
+            }
 
             // Sanity check that the local HEAD points to the same commit
             // as the remote HEAD
@@ -357,8 +399,14 @@ pub enum GitError {
     BlobLookup(#[from] Box<gix::odb::find::existing::Error<gix::odb::store::find::Error>>),
     #[error(transparent)]
     RemoteLookup(#[from] Box<gix::remote::find::existing::Error>),
-    #[error("unable to determine a suitable remote")]
-    UnknownRemote,
+    #[error(transparent)]
+    Lock(#[from] gix::lock::acquire::Error),
+    #[error(transparent)]
+    RemoteName(#[from] gix::remote::name::Error),
+    #[error(transparent)]
+    Config(#[from] Box<gix::config::Error>),
+    #[error(transparent)]
+    ConfigValue(#[from] gix::config::file::set_raw_value::Error),
     #[error("unable to locate remote HEAD")]
     UnableToFindRemoteHead,
     #[error("unable to update HEAD to remote HEAD")]
@@ -383,37 +431,43 @@ impl GitError {
     /// repo being locked, and could succeed if retried
     #[inline]
     pub fn is_locked(&self) -> bool {
-        if let Self::Fetch(gix::remote::fetch::Error::UpdateRefs(ure))
-        | Self::CloneFetch(gix::clone::fetch::Error::Fetch(
-            gix::remote::fetch::Error::UpdateRefs(ure),
-        )) = self
-        {
-            if let gix::remote::fetch::refs::update::Error::EditReferences(ere) = ure {
-                return match ere {
-                    gix::reference::edit::Error::FileTransactionPrepare(ftpe) => {
-                        use gix::refs::file::transaction::prepare::Error as PrepError;
-                        if let PrepError::LockAcquire { source, .. }
-                        | PrepError::PackedTransactionAcquire(source) = ftpe
-                        {
-                            // currently this is either io or permanentlylocked, but just in case
-                            // more variants are added, we just assume it's possible to retry
-                            // in anything but the permanentlylocked variant
-                            !matches!(source, gix::lock::acquire::Error::PermanentlyLocked { .. })
-                        } else {
-                            false
+        match self {
+            Self::Fetch(gix::remote::fetch::Error::UpdateRefs(ure))
+            | Self::CloneFetch(gix::clone::fetch::Error::Fetch(
+                gix::remote::fetch::Error::UpdateRefs(ure),
+            )) => {
+                if let gix::remote::fetch::refs::update::Error::EditReferences(ere) = ure {
+                    match ere {
+                        gix::reference::edit::Error::FileTransactionPrepare(ftpe) => {
+                            use gix::refs::file::transaction::prepare::Error as PrepError;
+                            if let PrepError::LockAcquire { source, .. }
+                            | PrepError::PackedTransactionAcquire(source) = ftpe
+                            {
+                                // currently this is either io or permanentlylocked, but just in case
+                                // more variants are added, we just assume it's possible to retry
+                                // in anything but the permanentlylocked variant
+                                !matches!(
+                                    source,
+                                    gix::lock::acquire::Error::PermanentlyLocked { .. }
+                                )
+                            } else {
+                                false
+                            }
                         }
+                        gix::reference::edit::Error::FileTransactionCommit(ftce) => {
+                            matches!(
+                                ftce,
+                                gix::refs::file::transaction::commit::Error::LockCommit { .. }
+                            )
+                        }
+                        _ => false,
                     }
-                    gix::reference::edit::Error::FileTransactionCommit(ftce) => {
-                        matches!(
-                            ftce,
-                            gix::refs::file::transaction::commit::Error::LockCommit { .. }
-                        )
-                    }
-                    _ => false,
-                };
+                } else {
+                    false
+                }
             }
+            Self::Lock(le) => !matches!(le, gix::lock::acquire::Error::PermanentlyLocked { .. }),
+            _ => false,
         }
-
-        false
     }
 }
