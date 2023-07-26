@@ -411,37 +411,43 @@ impl GitError {
     /// repo being locked, and could succeed if retried
     #[inline]
     pub fn is_locked(&self) -> bool {
-        if let Self::Fetch(gix::remote::fetch::Error::UpdateRefs(ure))
-        | Self::CloneFetch(gix::clone::fetch::Error::Fetch(
-            gix::remote::fetch::Error::UpdateRefs(ure),
-        )) = self
-        {
-            if let gix::remote::fetch::refs::update::Error::EditReferences(ere) = ure {
-                return match ere {
-                    gix::reference::edit::Error::FileTransactionPrepare(ftpe) => {
-                        use gix::refs::file::transaction::prepare::Error as PrepError;
-                        if let PrepError::LockAcquire { source, .. }
-                        | PrepError::PackedTransactionAcquire(source) = ftpe
-                        {
-                            // currently this is either io or permanentlylocked, but just in case
-                            // more variants are added, we just assume it's possible to retry
-                            // in anything but the permanentlylocked variant
-                            !matches!(source, gix::lock::acquire::Error::PermanentlyLocked { .. })
-                        } else {
-                            false
+        match self {
+            Self::Fetch(gix::remote::fetch::Error::UpdateRefs(ure))
+            | Self::CloneFetch(gix::clone::fetch::Error::Fetch(
+                gix::remote::fetch::Error::UpdateRefs(ure),
+            )) => {
+                if let gix::remote::fetch::refs::update::Error::EditReferences(ere) = ure {
+                    match ere {
+                        gix::reference::edit::Error::FileTransactionPrepare(ftpe) => {
+                            use gix::refs::file::transaction::prepare::Error as PrepError;
+                            if let PrepError::LockAcquire { source, .. }
+                            | PrepError::PackedTransactionAcquire(source) = ftpe
+                            {
+                                // currently this is either io or permanentlylocked, but just in case
+                                // more variants are added, we just assume it's possible to retry
+                                // in anything but the permanentlylocked variant
+                                !matches!(
+                                    source,
+                                    gix::lock::acquire::Error::PermanentlyLocked { .. }
+                                )
+                            } else {
+                                false
+                            }
                         }
+                        gix::reference::edit::Error::FileTransactionCommit(ftce) => {
+                            matches!(
+                                ftce,
+                                gix::refs::file::transaction::commit::Error::LockCommit { .. }
+                            )
+                        }
+                        _ => false,
                     }
-                    gix::reference::edit::Error::FileTransactionCommit(ftce) => {
-                        matches!(
-                            ftce,
-                            gix::refs::file::transaction::commit::Error::LockCommit { .. }
-                        )
-                    }
-                    _ => false,
-                };
+                } else {
+                    false
+                }
             }
+            Self::Lock(le) => !matches!(le, gix::lock::acquire::Error::PermanentlyLocked { .. }),
+            _ => false,
         }
-
-        false
     }
 }
