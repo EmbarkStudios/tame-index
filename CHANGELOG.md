@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.2] - 2023-07-26
 ### Changed
 - [PR#5](https://github.com/EmbarkStudios/tame-index/pull/5) relaxed `rust-version` to 1.67.0.
 
@@ -40,7 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.2...HEAD
+[0.2.2]: https://github.com/EmbarkStudios/tame-index/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/EmbarkStudios/tame-index/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/EmbarkStudios/tame-index/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/EmbarkStudios/tame-index/compare/0.0.1...0.1.0
