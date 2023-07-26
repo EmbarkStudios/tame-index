@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.3] - 2023-07-26
 ### Fixed
 - [PR#6](https://github.com/EmbarkStudios/tame-index/pull/6) fixed two bugs with git registries.
     1. `cargo` does not set remotes for git registry indices, the previous code assumed there was a remote, thus failed to fetch updates
@@ -46,7 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.2...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.3...HEAD
+[0.2.3]: https://github.com/EmbarkStudios/tame-index/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/EmbarkStudios/tame-index/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/EmbarkStudios/tame-index/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/EmbarkStudios/tame-index/compare/0.1.0...0.2.0
