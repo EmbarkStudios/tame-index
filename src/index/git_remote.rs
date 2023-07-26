@@ -190,8 +190,6 @@ impl RemoteGitIndex {
     /// Performs a fetch from the remote index repository.
     ///
     /// This method performs network I/O.
-    ///
-    /// If there is a new remote HEAD, this will invalidate all local cache entries
     #[inline]
     pub fn fetch(&mut self) -> Result<(), Error> {
         self.fetch_with_options(gix::progress::Discard, &AtomicBool::default())
@@ -365,4 +363,57 @@ pub enum GitError {
     UnableToFindRemoteHead,
     #[error("unable to update HEAD to remote HEAD")]
     UnableToUpdateHead,
+}
+
+impl GitError {
+    /// Returns true if the error is a (potentially) spurious network error that
+    /// indicates a retry of the operation could succeed
+    #[inline]
+    pub fn is_spurious(&self) -> bool {
+        use gix::protocol::transport::IsSpuriousError;
+
+        if let Self::Fetch(fe) | Self::CloneFetch(gix::clone::fetch::Error::Fetch(fe)) = self {
+            fe.is_spurious()
+        } else {
+            false
+        }
+    }
+
+    /// Returns true if a fetch could not be completed successfully due to the
+    /// repo being locked, and could succeed if retried
+    #[inline]
+    pub fn is_locked(&self) -> bool {
+        if let Self::Fetch(gix::remote::fetch::Error::UpdateRefs(ure))
+        | Self::CloneFetch(gix::clone::fetch::Error::Fetch(
+            gix::remote::fetch::Error::UpdateRefs(ure),
+        )) = self
+        {
+            if let gix::remote::fetch::refs::update::Error::EditReferences(ere) = ure {
+                return match ere {
+                    gix::reference::edit::Error::FileTransactionPrepare(ftpe) => {
+                        use gix::refs::file::transaction::prepare::Error as PrepError;
+                        if let PrepError::LockAcquire { source, .. }
+                        | PrepError::PackedTransactionAcquire(source) = ftpe
+                        {
+                            // currently this is either io or permanentlylocked, but just in case
+                            // more variants are added, we just assume it's possible to retry
+                            // in anything but the permanentlylocked variant
+                            !matches!(source, gix::lock::acquire::Error::PermanentlyLocked { .. })
+                        } else {
+                            false
+                        }
+                    }
+                    gix::reference::edit::Error::FileTransactionCommit(ftce) => {
+                        matches!(
+                            ftce,
+                            gix::refs::file::transaction::commit::Error::LockCommit { .. }
+                        )
+                    }
+                    _ => false,
+                };
+            }
+        }
+
+        false
+    }
 }
