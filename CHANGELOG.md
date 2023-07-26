@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.1] - 2023-07-26
 ### Added
 - [PR#4](https://github.com/EmbarkStudios/tame-index/pull/4) added `GitError::is_spurious` and `GitError::is_locked` to detect fetch errors that could potentially succeed in the future if retried.
 
@@ -36,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/EmbarkStudios/tame-index/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/EmbarkStudios/tame-index/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/EmbarkStudios/tame-index/compare/0.0.1...0.1.0
 [0.0.1]: https://github.com/EmbarkStudios/tame-index/releases/tag/0.0.1
