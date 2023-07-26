@@ -322,8 +322,23 @@ impl RemoteGitIndex {
                 Kind::Unborn(_) | Kind::Detached { .. } => None,
             };
 
-            self.repo
-                .edit_reference(edit.unwrap_or_else(|| tx::RefEdit {
+            // We're updating the reflog which requires a committer be set, which might
+            // not be the case, particular in a CI environment, but also would default
+            // to the git config for the current directory/global, which on a normal
+            // user machine would show the user was the one who updated the database which
+            // is kind of misleading, so we just override the config for this operation
+            {
+                let repo = {
+                    let mut config = self.repo.config_snapshot_mut();
+                    config.set_raw_value("committer", None, "name", "tame-index")?;
+                    // Note we _have_ to set the email as well, but luckily gix does not actually
+                    // validate if it's a proper email or not :)
+                    config.set_raw_value("committer", None, "email", "")?;
+
+                    config.commit_auto_rollback()?
+                };
+
+                repo.edit_reference(edit.unwrap_or_else(|| tx::RefEdit {
                     change: tx::Change::Update {
                         log: tx::LogChange {
                             mode: tx::RefLog::AndReference,
@@ -336,6 +351,7 @@ impl RemoteGitIndex {
                     name: "HEAD".try_into().unwrap(),
                     deref: true,
                 }))?;
+            }
 
             // Sanity check that the local HEAD points to the same commit
             // as the remote HEAD
@@ -387,6 +403,10 @@ pub enum GitError {
     Lock(#[from] gix::lock::acquire::Error),
     #[error(transparent)]
     RemoteName(#[from] gix::remote::name::Error),
+    #[error(transparent)]
+    Config(#[from] gix::config::Error),
+    #[error(transparent)]
+    ConfigValue(#[from] gix::config::file::set_raw_value::Error),
     #[error("unable to locate remote HEAD")]
     UnableToFindRemoteHead,
     #[error("unable to update HEAD to remote HEAD")]
