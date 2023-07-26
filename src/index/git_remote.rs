@@ -335,7 +335,7 @@ impl RemoteGitIndex {
                     // validate if it's a proper email or not :)
                     config.set_raw_value("committer", None, "email", "")?;
 
-                    config.commit_auto_rollback()?
+                    config.commit_auto_rollback().map_err(Box::new)?
                 };
 
                 repo.edit_reference(edit.unwrap_or_else(|| tx::RefEdit {
@@ -404,7 +404,7 @@ pub enum GitError {
     #[error(transparent)]
     RemoteName(#[from] gix::remote::name::Error),
     #[error(transparent)]
-    Config(#[from] gix::config::Error),
+    Config(#[from] Box<gix::config::Error>),
     #[error(transparent)]
     ConfigValue(#[from] gix::config::file::set_raw_value::Error),
     #[error("unable to locate remote HEAD")]
