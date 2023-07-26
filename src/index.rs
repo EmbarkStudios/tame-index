@@ -29,9 +29,6 @@ pub use sparse::SparseIndex;
 #[cfg(feature = "sparse")]
 pub use sparse_remote::{AsyncRemoteSparseIndex, RemoteSparseIndex};
 
-#[cfg(any(feature = "sparse", feature = "local-builder"))]
-pub use reqwest;
-
 /// Global configuration of an index, reflecting the [contents of config.json](https://doc.rust-lang.org/cargo/reference/registries.html#index-format).
 #[derive(Eq, PartialEq, PartialOrd, Ord, Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct IndexConfig {
