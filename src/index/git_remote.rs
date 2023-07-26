@@ -239,7 +239,7 @@ impl RemoteGitIndex {
     /// This method performs network I/O.
     #[inline]
     pub fn fetch(&mut self) -> Result<(), Error> {
-        self.fetch_with_options(gix::progress::Discard, &AtomicBool::default())
+        self.fetch_with_options(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)
     }
 
     /// Same as [`Self::fetch`] but allows specifying a progress implementation
@@ -350,7 +350,8 @@ impl RemoteGitIndex {
                     },
                     name: "HEAD".try_into().unwrap(),
                     deref: true,
-                }))?;
+                }))
+                .expect("oh no");
             }
 
             // Sanity check that the local HEAD points to the same commit
