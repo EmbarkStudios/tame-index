@@ -350,8 +350,7 @@ impl RemoteGitIndex {
                     },
                     name: "HEAD".try_into().unwrap(),
                     deref: true,
-                }))
-                .expect("oh no");
+                }))?;
             }
 
             // Sanity check that the local HEAD points to the same commit
