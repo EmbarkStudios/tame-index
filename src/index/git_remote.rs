@@ -338,6 +338,8 @@ impl RemoteGitIndex {
                     config.commit_auto_rollback().map_err(Box::new)?
                 };
 
+                assert_eq!(repo.committer().unwrap().unwrap().name, "tame-index");
+
                 repo.edit_reference(edit.unwrap_or_else(|| tx::RefEdit {
                     change: tx::Change::Update {
                         log: tx::LogChange {
