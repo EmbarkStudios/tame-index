@@ -467,17 +467,6 @@ fn non_main_local_branch() {
             "git failed to init directory"
         );
 
-        // Add the remote, we expect the remote to already be set if the repo exists
-        let mut cmd = std::process::Command::new("git");
-        cmd.arg("-C");
-        cmd.arg(local_td.path());
-        cmd.args(["remote", "add", "origin"]);
-        cmd.arg(remote.td.path());
-        assert!(
-            cmd.status().expect("failed to run git").success(),
-            "git failed to add remote"
-        );
-
         // Add a fake commit so that we have a local HEAD
         let mut repo = gix::open(local_td.path()).unwrap();
 
@@ -498,35 +487,37 @@ fn non_main_local_branch() {
             .detach()
         };
 
-        use gix::refs::transaction as tx;
-        repo.edit_reference(tx::RefEdit {
-            change: tx::Change::Update {
-                log: tx::LogChange {
-                    mode: tx::RefLog::AndReference,
-                    force_create_reflog: false,
-                    message: "".into(),
-                },
-                expected: tx::PreviousValue::Any,
-                new: gix::refs::Target::Peeled(commit),
-            },
-            name: "refs/heads/master".try_into().unwrap(),
-            deref: false,
-        })
-        .unwrap();
+        dbg!(&commit);
 
-        repo.edit_reference(tx::RefEdit {
-            change: tx::Change::Update {
-                log: tx::LogChange {
-                    mode: tx::RefLog::AndReference,
-                    force_create_reflog: false,
-                    message: "".into(),
+        use gix::refs::transaction as tx;
+        repo.edit_references([
+            tx::RefEdit {
+                change: tx::Change::Update {
+                    log: tx::LogChange {
+                        mode: tx::RefLog::AndReference,
+                        force_create_reflog: false,
+                        message: "".into(),
+                    },
+                    expected: tx::PreviousValue::Any,
+                    new: gix::refs::Target::Peeled(commit),
                 },
-                expected: tx::PreviousValue::Any,
-                new: gix::refs::Target::Symbolic("refs/heads/master".try_into().unwrap()),
+                name: "refs/heads/master".try_into().unwrap(),
+                deref: false,
             },
-            name: "HEAD".try_into().unwrap(),
-            deref: false,
-        })
+            tx::RefEdit {
+                change: tx::Change::Update {
+                    log: tx::LogChange {
+                        mode: tx::RefLog::AndReference,
+                        force_create_reflog: false,
+                        message: "".into(),
+                    },
+                    expected: tx::PreviousValue::Any,
+                    new: gix::refs::Target::Symbolic("refs/heads/master".try_into().unwrap()),
+                },
+                name: "HEAD".try_into().unwrap(),
+                deref: false,
+            },
+        ])
         .unwrap();
 
         assert_eq!(commit, repo.head_commit().unwrap().id);

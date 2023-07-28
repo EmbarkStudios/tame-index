@@ -9,6 +9,7 @@ use std::sync::atomic::AtomicBool;
 pub struct RemoteGitIndex {
     index: GitIndex,
     repo: gix::Repository,
+    head_commit: gix::ObjectId,
 }
 
 const DIR: gix::remote::Direction = gix::remote::Direction::Fetch;
@@ -93,28 +94,42 @@ impl RemoteGitIndex {
             })
             .or_else(|| gix::open_opts(&index.cache.path, open_with_complete_config).ok());
 
-            let repo = if let Some(repo) = repo {
-                repo
+            let res = if let Some(repo) = repo {
+                (repo, None)
             } else {
-                let (repo, _out) = gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
+                let (repo, out) = gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
                     .map_err(Box::new)?
                     .with_remote_name("origin")?
                     .configure_remote(|remote| {
                         Ok(remote.with_refspecs(["+HEAD:refs/remotes/origin/HEAD"], DIR)?)
                     })
                     .fetch_only(progress, should_interrupt)?;
-                repo
+
+                (repo, Some(out))
             };
 
-            Ok(repo)
+            Ok(res)
         };
 
-        let mut repo = open_or_clone_repo()?;
+        let (mut repo, fetch_outcome) = open_or_clone_repo()?;
+
+        if let Some(fetch_outcome) = fetch_outcome {
+            crate::utils::git::write_fetch_head(
+                &repo,
+                &fetch_outcome,
+                &repo.find_remote("origin").unwrap(),
+            )?;
+        }
+
         repo.object_cache_size_if_unset(4 * 1024 * 1024);
 
-        Self::set_head(&mut index, &repo)?;
+        let head_commit = Self::set_head(&mut index, &repo)?;
 
-        Ok(Self { repo, index })
+        Ok(Self {
+            repo,
+            index,
+            head_commit,
+        })
     }
 
     /// Gets the local index
@@ -139,15 +154,57 @@ impl RemoteGitIndex {
     /// Sets the head commit in the wrapped index so that cache entries can be
     /// properly filtered
     #[inline]
-    fn set_head(index: &mut GitIndex, repo: &gix::Repository) -> Result<(), Error> {
-        let head = repo.head_commit().ok().map(|head| {
-            let gix::ObjectId::Sha1(sha1) = head.id;
-            sha1
-        });
+    fn set_head(index: &mut GitIndex, repo: &gix::Repository) -> Result<gix::ObjectId, Error> {
+        let find_remote_head = || -> Result<gix::ObjectId, GitError> {
+            const CANDIDATE_REFS: &[&str] = &[
+                "FETCH_HEAD",    /* the location with the most-recent updates, as written by git2 */
+                "origin/HEAD", /* typical refspecs update this symbolic ref to point to the actual remote ref with the fetched commit */
+                "origin/master", /* for good measure, resolve this branch by hand in case origin/HEAD is broken */
+                "HEAD",
+            ];
+            let mut candidates: Vec<_> = CANDIDATE_REFS
+                .iter()
+                .enumerate()
+                .filter_map(|(i, refname)| {
+                    let ref_id = dbg!(repo.find_reference(*refname))
+                        .ok()?
+                        .into_fully_peeled_id()
+                        .ok()?;
 
-        index.set_head_commit(head);
+                    let commit = ref_id.object().ok()?.try_into_commit().ok()?;
+                    let commit_time = commit.time().ok()?.seconds;
 
-        Ok(())
+                    Some((i, commit.id, commit_time))
+                })
+                .collect();
+
+            // Sort from oldest to newest, the last one will be the best reference
+            // we could reasonably locate, and since we are on second resolution,
+            // prefer the ordering of candidates if times are equal.
+            //
+            // This allows FETCH_HEAD to be authoritative, unless one of the other
+            // references is more up to date, which can occur in (at least) 2 scenarios:
+            //
+            // 1. The repo is a fresh clone by cargo either via git or libgit2,
+            // neither of which write FETCH_HEAD during clone
+            // 2. A fetch was performed by an external crate/program to cargo or
+            // ourselves that didn't update FETCH_HEAD
+            candidates.sort_by(|a, b| match a.2.cmp(&b.2) {
+                std::cmp::Ordering::Equal => b.0.cmp(&a.0),
+                o => o,
+            });
+
+            // get the most recent commit, the one with most time passed since unix epoch.
+            Ok(candidates
+                .last()
+                .ok_or_else(|| GitError::UnableToFindRemoteHead)?
+                .1)
+        };
+
+        let gix::ObjectId::Sha1(sha1) = find_remote_head()?;
+        index.set_head_commit(Some(sha1));
+
+        Ok(gix::ObjectId::Sha1(sha1))
     }
 
     /// Attempts to read the specified crate's index metadata
@@ -182,7 +239,12 @@ impl RemoteGitIndex {
     }
 
     fn read_blob(&self, path: &str) -> Result<Option<gix::ObjectDetached>, GitError> {
-        let tree = self.repo.head_commit()?.tree()?;
+        let tree = self
+            .repo
+            .find_object(self.head_commit)
+            .map_err(Box::new)?
+            .try_into_commit()?
+            .tree()?;
 
         let mut buf = Vec::new();
         let Some(entry) = tree.lookup_entry_by_path(path, &mut buf).map_err(|err| GitError::BlobLookup(Box::new(err)))? else { return Ok(None) };
@@ -253,119 +315,31 @@ impl RemoteGitIndex {
         P: gix::Progress,
         P::SubProgress: 'static,
     {
-        let mut perform_fetch = || -> Result<(), GitError> {
+        let mut perform_fetch = || -> Result<_, GitError> {
             let mut remote = self.repo.find_remote("origin").ok().unwrap_or_else(|| {
                 self.repo
                     .remote_at(self.index.url.as_str())
                     .expect("owned URL is always valid")
             });
 
-            let remote_head = "refs/remotes/origin/HEAD";
-
             remote
-                .replace_refspecs(Some(format!("+HEAD:{remote_head}").as_str()), DIR)
+                .replace_refspecs(Some("+HEAD:refs/remotes/origin/HEAD"), DIR)
                 .expect("valid statically known refspec");
 
             // Perform the actual fetch
-            let fetch_response: gix::remote::fetch::Outcome = remote
+            let outcome = remote
                 .connect(DIR)
                 .map_err(Box::new)?
                 .prepare_fetch(&mut progress, Default::default())
                 .map_err(Box::new)?
                 .receive(&mut progress, should_interrupt)?;
 
-            // Find the commit id of the remote's HEAD
-            let remote_head_id = fetch_response.ref_map.mappings.iter().find_map(|mapping| {
-                let gix::remote::fetch::Source::Ref(rref) = &mapping.remote else { return None; };
-
-                if mapping.local.as_deref()? != remote_head.as_bytes() {
-                    return None;
-                }
-
-                let gix::protocol::handshake::Ref::Symbolic {
-                    full_ref_name,
-                    object,
-                    ..
-                } = rref else { return None; };
-
-                (full_ref_name == "HEAD").then_some(*object)
-            }).ok_or(GitError::UnableToFindRemoteHead)?;
-
-            use gix::refs::{transaction as tx, Target};
-
-            // In all (hopefully?) cases HEAD is a symbolic reference to
-            // refs/heads/<branch> which is a peeled commit id, if that's the case
-            // we update it to the new commit id, otherwise we just set HEAD
-            // directly
-            use gix::head::Kind;
-            let edit = match self.repo.head().map_err(Box::new)?.kind {
-                Kind::Symbolic(sref) => {
-                    // Update our local HEAD to the remote HEAD
-                    if let Target::Symbolic(name) = sref.target {
-                        Some(tx::RefEdit {
-                            change: tx::Change::Update {
-                                log: tx::LogChange {
-                                    mode: tx::RefLog::AndReference,
-                                    force_create_reflog: false,
-                                    message: "".into(),
-                                },
-                                expected: tx::PreviousValue::MustExist,
-                                new: gix::refs::Target::Peeled(remote_head_id),
-                            },
-                            name,
-                            deref: true,
-                        })
-                    } else {
-                        None
-                    }
-                }
-                Kind::Unborn(_) | Kind::Detached { .. } => None,
-            };
-
-            // We're updating the reflog which requires a committer be set, which might
-            // not be the case, particular in a CI environment, but also would default
-            // to the git config for the current directory/global, which on a normal
-            // user machine would show the user was the one who updated the database which
-            // is kind of misleading, so we just override the config for this operation
-            {
-                let repo = {
-                    let mut config = self.repo.config_snapshot_mut();
-                    config.set_raw_value("committer", None, "name", "tame-index")?;
-                    // Note we _have_ to set the email as well, but luckily gix does not actually
-                    // validate if it's a proper email or not :)
-                    config.set_raw_value("committer", None, "email", "")?;
-
-                    config.commit_auto_rollback().map_err(Box::new)?
-                };
-
-                assert_eq!(repo.committer().unwrap().unwrap().name, "tame-index");
-
-                repo.edit_reference(edit.unwrap_or_else(|| tx::RefEdit {
-                    change: tx::Change::Update {
-                        log: tx::LogChange {
-                            mode: tx::RefLog::AndReference,
-                            force_create_reflog: false,
-                            message: "".into(),
-                        },
-                        expected: tx::PreviousValue::Any,
-                        new: gix::refs::Target::Peeled(remote_head_id),
-                    },
-                    name: "HEAD".try_into().unwrap(),
-                    deref: true,
-                }))?;
-            }
-
-            // Sanity check that the local HEAD points to the same commit
-            // as the remote HEAD
-            if remote_head_id != self.repo.head_commit()?.id {
-                Err(GitError::UnableToUpdateHead)
-            } else {
-                Ok(())
-            }
+            Ok((remote, outcome))
         };
 
-        perform_fetch()?;
-        Self::set_head(&mut self.index, &self.repo)?;
+        let (remote, fetch_outcome) = perform_fetch()?;
+        crate::utils::git::write_fetch_head(&self.repo, &fetch_outcome, &remote)?;
+        self.head_commit = Self::set_head(&mut self.index, &self.repo)?;
 
         Ok(())
     }
@@ -395,6 +369,8 @@ pub enum GitError {
     HeadUpdate(#[from] gix::reference::edit::Error),
     #[error(transparent)]
     Commit(#[from] gix::object::commit::Error),
+    #[error(transparent)]
+    InvalidObject(#[from] gix::object::try_into::Error),
     #[error(transparent)]
     ReferenceLookup(#[from] Box<gix::reference::find::existing::Error>),
     #[error(transparent)]

@@ -3,6 +3,9 @@
 
 use crate::{Error, InvalidUrl, InvalidUrlError, PathBuf};
 
+#[cfg(feature = "git")]
+pub mod git;
+
 /// Returns the storage directory (in utf-8) used by Cargo, often knowns as
 /// `.cargo` or `CARGO_HOME`
 #[inline]
