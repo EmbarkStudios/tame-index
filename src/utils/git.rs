@@ -2,7 +2,7 @@
 
 use crate::{error::GitError, Error};
 
-/// Writes the FETCH_HEAD for the specified fetch outcome to the specified git
+/// Writes the `FETCH_HEAD` for the specified fetch outcome to the specified git
 /// repository
 ///
 /// This function is narrowly focused on on writing a `FETCH_HEAD` that contains
@@ -14,9 +14,9 @@ use crate::{error::GitError, Error};
 ///     1. A `FETCH_HEAD` that closely (or even exactly) matches that created by
 /// cargo via git or git2 when fetching only `+HEAD:refs/remotes/origin/HEAD`
 ///
-/// Calling this function for the fetch outcome of a clone will write FETCH_HEAD
+/// Calling this function for the fetch outcome of a clone will write `FETCH_HEAD`
 /// just as if a normal fetch had occurred, but note that AFAICT neither git nor
-/// git2 does this, ie. a fresh clone will not have a FETCH_HEAD present. I don't
+/// git2 does this, ie. a fresh clone will not have a `FETCH_HEAD` present. I don't
 /// _think_ that has negative implications, but if it does...just don't call this
 /// function on the result of a clone :)
 ///
@@ -46,7 +46,7 @@ pub fn write_fetch_head(
                 object,
             } = rref else { return None; };
 
-            (full_ref_name == "HEAD").then(|| (target, object))
+            (full_ref_name == "HEAD").then_some((target, object))
         })
         .ok_or_else(|| GitError::UnableToFindRemoteHead)?;
 
@@ -59,58 +59,62 @@ pub fn write_fetch_head(
         String::from_utf8(v).expect("remote url was not utf-8 :-/")
     };
 
-    let mut hex_id = [0u8; 40];
-    let gix::ObjectId::Sha1(sha1) = oid;
-    let commit_id = crate::utils::encode_hex(&sha1, &mut hex_id);
+    let fetch_head = {
+        let mut hex_id = [0u8; 40];
+        let gix::ObjectId::Sha1(sha1) = oid;
+        let commit_id = crate::utils::encode_hex(sha1, &mut hex_id);
 
-    let mut fetch_head = String::new();
+        let mut fetch_head = String::new();
 
-    let remote_name = remote
-        .name()
-        .and_then(|n| {
-            let gix::remote::Name::Symbol(name) = n else { return None; };
-            Some(name.as_ref())
-        })
-        .unwrap_or("origin");
-
-    // We write the remote HEAD first, but _only_ if it was explicitly requested
-    if remote
-        .refspecs(gix::remote::Direction::Fetch)
-        .iter()
-        .any(|rspec| {
-            let rspec = rspec.to_ref();
-            if !rspec.remote().map_or(false, |r| r.ends_with(b"HEAD")) {
-                return false;
-            }
-
-            rspec.local().map_or(false, |l| {
-                l.to_str()
-                    .ok()
-                    .and_then(|l| {
-                        l.strip_prefix("refs/remotes/")
-                            .and_then(|l| l.strip_suffix("/HEAD"))
-                    })
-                    .map_or(false, |remote| remote == remote_name)
+        let remote_name = remote
+            .name()
+            .and_then(|n| {
+                let gix::remote::Name::Symbol(name) = n else { return None; };
+                Some(name.as_ref())
             })
-        })
-    {
-        writeln!(&mut fetch_head, "{commit_id}\t\t{remote_url}").unwrap();
-    }
+            .unwrap_or("origin");
 
-    // Attempt to get the branch name, but if it looks suspect just skip this,
-    // it _should_ be fine, or at least, we've already written the only thing
-    // that gix can currently parse
-    if let Some(branch_name) = head_target_branch
-        .to_str()
-        .ok()
-        .and_then(|s| s.strip_prefix("refs/heads/"))
-    {
-        writeln!(
-            &mut fetch_head,
-            "{commit_id}\t\tbranch '{branch_name}' of {remote_url}"
-        )
-        .unwrap();
-    }
+        // We write the remote HEAD first, but _only_ if it was explicitly requested
+        if remote
+            .refspecs(gix::remote::Direction::Fetch)
+            .iter()
+            .any(|rspec| {
+                let rspec = rspec.to_ref();
+                if !rspec.remote().map_or(false, |r| r.ends_with(b"HEAD")) {
+                    return false;
+                }
+
+                rspec.local().map_or(false, |l| {
+                    l.to_str()
+                        .ok()
+                        .and_then(|l| {
+                            l.strip_prefix("refs/remotes/")
+                                .and_then(|l| l.strip_suffix("/HEAD"))
+                        })
+                        .map_or(false, |remote| remote == remote_name)
+                })
+            })
+        {
+            writeln!(&mut fetch_head, "{commit_id}\t\t{remote_url}").unwrap();
+        }
+
+        // Attempt to get the branch name, but if it looks suspect just skip this,
+        // it _should_ be fine, or at least, we've already written the only thing
+        // that gix can currently parse
+        if let Some(branch_name) = head_target_branch
+            .to_str()
+            .ok()
+            .and_then(|s| s.strip_prefix("refs/heads/"))
+        {
+            writeln!(
+                &mut fetch_head,
+                "{commit_id}\t\tbranch '{branch_name}' of {remote_url}"
+            )
+            .unwrap();
+        }
+
+        fetch_head
+    };
 
     if fetch_head.is_empty() {
         return Err(GitError::UnableToFindRemoteHead.into());

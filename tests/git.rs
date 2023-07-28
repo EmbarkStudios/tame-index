@@ -487,8 +487,6 @@ fn non_main_local_branch() {
             .detach()
         };
 
-        dbg!(&commit);
-
         use gix::refs::transaction as tx;
         repo.edit_references([
             tx::RefEdit {

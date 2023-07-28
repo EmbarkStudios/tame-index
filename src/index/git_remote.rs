@@ -166,7 +166,8 @@ impl RemoteGitIndex {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, refname)| {
-                    let ref_id = dbg!(repo.find_reference(*refname))
+                    let ref_id = repo
+                        .find_reference(*refname)
                         .ok()?
                         .into_fully_peeled_id()
                         .ok()?;
