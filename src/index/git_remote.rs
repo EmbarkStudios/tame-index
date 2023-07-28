@@ -316,31 +316,46 @@ impl RemoteGitIndex {
         P: gix::Progress,
         P::SubProgress: 'static,
     {
-        let mut perform_fetch = || -> Result<_, GitError> {
-            let mut remote = self.repo.find_remote("origin").ok().unwrap_or_else(|| {
-                self.repo
-                    .remote_at(self.index.url.as_str())
-                    .expect("owned URL is always valid")
-            });
+        // We're updating the reflog which requires a committer be set, which might
+        // not be the case, particular in a CI environment, but also would default
+        // the the git config for the current directory/global, which on a normal
+        // user machine would show the user was the one who updated the database which
+        // is kind of misleading, so we just override the config for this operation
 
-            remote
-                .replace_refspecs(Some("+HEAD:refs/remotes/origin/HEAD"), DIR)
-                .expect("valid statically known refspec");
+        let mut config = self.repo.config_snapshot_mut();
+        config
+            .set_raw_value("committer", None, "name", "tame-index")
+            .map_err(GitError::from)?;
+        // Note we _have_ to set the email as well, but luckily gix does not actually
+        // validate if it's a proper email or not :)
+        config
+            .set_raw_value("committer", None, "email", "")
+            .map_err(GitError::from)?;
 
-            // Perform the actual fetch
-            let outcome = remote
-                .connect(DIR)
-                .map_err(Box::new)?
-                .prepare_fetch(&mut progress, Default::default())
-                .map_err(Box::new)?
-                .receive(&mut progress, should_interrupt)?;
+        let repo = config
+            .commit_auto_rollback()
+            .map_err(|err| GitError::from(Box::new(err)))?;
 
-            Ok((remote, outcome))
-        };
+        let mut remote = repo.find_remote("origin").ok().unwrap_or_else(|| {
+            repo.remote_at(self.index.url.as_str())
+                .expect("owned URL is always valid")
+        });
 
-        let (remote, fetch_outcome) = perform_fetch()?;
-        crate::utils::git::write_fetch_head(&self.repo, &fetch_outcome, &remote)?;
-        self.head_commit = Self::set_head(&mut self.index, &self.repo)?;
+        remote
+            .replace_refspecs(Some("+HEAD:refs/remotes/origin/HEAD"), DIR)
+            .expect("valid statically known refspec");
+
+        // Perform the actual fetch
+        let outcome = remote
+            .connect(DIR)
+            .map_err(|err| GitError::from(Box::new(err)))?
+            .prepare_fetch(&mut progress, Default::default())
+            .map_err(|err| GitError::from(Box::new(err)))?
+            .receive(&mut progress, should_interrupt)
+            .map_err(GitError::from)?;
+
+        crate::utils::git::write_fetch_head(&repo, &outcome, &remote)?;
+        self.head_commit = Self::set_head(&mut self.index, &repo)?;
 
         Ok(())
     }
