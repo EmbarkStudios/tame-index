@@ -116,6 +116,14 @@ pub fn write_fetch_head(
         fetch_head
     };
 
+    // We _could_ also emit other branches/tags like git does, however it's more
+    // complicated than just our limited use case of writing remote HEAD
+    //
+    // 1. Remote branches are always emitted, however in gix those aren't part
+    // of the ref mappings if they haven't been updated since the last fetch
+    // 2. Conversely, tags are _not_ written by git unless they have been changed
+    // added, but gix _does_ always place those in the fetch mappings
+
     if fetch_head.is_empty() {
         return Err(GitError::UnableToFindRemoteHead.into());
     }
@@ -124,5 +132,5 @@ pub fn write_fetch_head(
     std::fs::write(&fetch_head_path, fetch_head)
         .map_err(|io| Error::IoPath(io, fetch_head_path))?;
 
-    Ok(oid.clone())
+    Ok(*oid)
 }
