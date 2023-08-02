@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.2.5] - 2023-08-02
 ### Fixed
 - [PR#9](https://github.com/EmbarkStudios/tame-index/pull/9) resolved [#8](https://github.com/EmbarkStudios/tame-index/issues/8) by ensuring (valid) non-official cargo build version output can also be parsed.
 
@@ -57,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.4...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.5...HEAD
+[0.2.5]: https://github.com/EmbarkStudios/tame-index/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/EmbarkStudios/tame-index/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/EmbarkStudios/tame-index/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/EmbarkStudios/tame-index/compare/0.2.1...0.2.2
