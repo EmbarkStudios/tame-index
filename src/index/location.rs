@@ -84,12 +84,11 @@ impl<'iu> IndexUrl<'iu> {
                 if let Some(si) = sparse_index {
                     si
                 } else {
-                    let semver = match cargo_version {
-                        Some(v) => std::borrow::Cow::Borrowed(v),
-                        None => crate::utils::cargo_version(None)?.into(),
+                    let vers = match cargo_version {
+                        Some(v) => v.trim().parse()?,
+                        None => crate::utils::cargo_version(None)?,
                     };
 
-                    let vers: semver::Version = semver.parse()?;
                     vers >= semver::Version::new(1, 70, 0)
                 }
             }

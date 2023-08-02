@@ -214,10 +214,28 @@ pub fn get_index_details(url: &str, root: Option<PathBuf>) -> Result<(PathBuf, S
     Ok((path, url_dir.canonical))
 }
 
-/// Retrieves the current version of cargo being used
-pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<String, Error> {
-    use std::io;
+use std::io;
 
+/// Parses the output of `cargo -V` to get the semver
+///
+/// This handles the 2? cases that I am aware of
+///
+/// 1. Official cargo prints `cargo <semver>(?:-<channel>)? (<sha1[..7]> <date>)
+/// 2. Non-official builds may drop the additional metadata and just print `cargo <semver>`
+#[inline]
+fn parse_cargo_semver(s: &str) -> Result<semver::Version, Error> {
+    let semver = s.trim().split(' ').nth(1).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "cargo version information was in an invalid format",
+        )
+    })?;
+
+    Ok(semver.parse()?)
+}
+
+/// Retrieves the current version of cargo being used
+pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<semver::Version, Error> {
     let mut cargo = std::process::Command::new(
         std::env::var_os("CARGO")
             .as_deref()
@@ -244,14 +262,7 @@ pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<String, Error>
     let stdout = String::from_utf8(output.stdout)
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
 
-    let semver = stdout.split(' ').nth(1).ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            "cargo version information was in an invalid format",
-        )
-    })?;
-
-    Ok(semver.to_owned())
+    parse_cargo_semver(&stdout)
 }
 
 #[cfg(test)]
@@ -337,7 +348,25 @@ mod test {
     #[test]
     fn gets_cargo_version() {
         const MINIMUM: semver::Version = semver::Version::new(1, 70, 0);
-        let version: semver::Version = super::cargo_version(None).unwrap().parse().unwrap();
+        let version = super::cargo_version(None).unwrap();
         assert!(version >= MINIMUM);
+    }
+
+    #[test]
+    fn parses_cargo_semver() {
+        use super::parse_cargo_semver as pcs;
+
+        assert_eq!(
+            pcs("cargo 1.71.0 (cfd3bbd8f 2023-06-08)\n").unwrap(),
+            semver::Version::new(1, 71, 0)
+        );
+        assert_eq!(
+            pcs("cargo 1.73.0-nightly (7ac9416d8 2023-07-24)\n").unwrap(),
+            "1.73.0-nightly".parse().unwrap()
+        );
+        assert_eq!(
+            pcs("cargo 1.70.0\n").unwrap(),
+            semver::Version::new(1, 70, 0)
+        );
     }
 }
