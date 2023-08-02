@@ -220,7 +220,7 @@ use std::io;
 ///
 /// This handles the 2? cases that I am aware of
 ///
-/// 1. Official cargo prints `cargo <semver>(?:-<channel>)? (<sha1[..7]> <date>)
+/// 1. Official cargo prints `cargo <semver>(?:-<channel>)? (<sha1[..7]> <date>)`
 /// 2. Non-official builds may drop the additional metadata and just print `cargo <semver>`
 #[inline]
 fn parse_cargo_semver(s: &str) -> Result<semver::Version, Error> {
