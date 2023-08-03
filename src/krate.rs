@@ -19,7 +19,7 @@ pub struct IndexVersion {
     pub name: SmolStr,
     /// [Version](https://doc.rust-lang.org/cargo/reference/manifest.html#the-version-field)
     #[serde(rename = "vers")]
-    pub version: Version,
+    pub version: SmolStr,
     /// [Dependencies](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html)
     pub deps: Arc<[IndexDependency]>,
     /// The SHA-256 for this crate version's tarball
@@ -51,7 +51,7 @@ impl IndexVersion {
     pub fn fake(name: &str, version: Version) -> Self {
         Self {
             name: name.into(),
-            version,
+            version: version.to_string().into(),
             deps: Arc::new([]),
             features: Arc::default(),
             features2: None,
@@ -251,7 +251,7 @@ impl IndexKrate {
     pub fn highest_version(&self) -> &IndexVersion {
         self.versions
             .iter()
-            .max_by_key(|v| &v.version)
+            .max_by_key(|v| Version::parse(&v.version).ok())
             // SAFETY: Versions inside the index will always adhere to
             // semantic versioning. If a crate is inside the index, at
             // least one version is available.
@@ -268,8 +268,19 @@ impl IndexKrate {
     pub fn highest_normal_version(&self) -> Option<&IndexVersion> {
         self.versions
             .iter()
-            .filter(|v| !v.is_yanked() && v.version.pre.is_empty())
-            .max_by_key(|v| &v.version)
+            .filter_map(|v| {
+                if v.is_yanked() {
+                    return None;
+                }
+
+                v.version
+                    .parse::<Version>()
+                    .ok()
+                    .filter(|v| v.pre.is_empty())
+                    .map(|vs| (v, vs))
+            })
+            .max_by(|a, b| a.1.cmp(&b.1))
+            .map(|(v, _vs)| v)
     }
 
     /// The crate's unique registry name. Case-sensitive, mostly.
