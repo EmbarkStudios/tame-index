@@ -30,14 +30,12 @@ fn parses_current_cargo_cache() {
         .expect("failed to parse cache entry")
         .unwrap();
 
-    /// The initial version of camino used by this crate, this version will _always_
-    /// exist in the index, even if it yanked in the future, and is otherwise immutable
-    const VERSION: semver::Version = semver::Version::new(1, 1, 4);
-
+    // The initial version of camino used by this crate, this version will _always_
+    // exist in the index, even if it yanked in the future, and is otherwise immutable
     let camino_version = camino
         .versions
         .iter()
-        .find(|iv| iv.version == VERSION)
+        .find(|iv| iv.version == "1.1.4")
         .expect("failed to find expected version");
 
     assert_eq!(

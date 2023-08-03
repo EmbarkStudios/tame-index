@@ -1,6 +1,7 @@
 //! Contains code for reading and writing [local registries](https://doc.rust-lang.org/cargo/reference/source-replacement.html#local-registry-sources)
 
 use crate::{Error, IndexKrate, KrateName, Path, PathBuf};
+use smol_str::SmolStr;
 
 #[cfg(feature = "local-builder")]
 pub mod builder;
@@ -14,7 +15,7 @@ pub enum LocalRegistryError {
         /// The name of the crate
         name: String,
         /// The specific crate version
-        version: semver::Version,
+        version: SmolStr,
     },
     /// A .crate file's checksum did not match the checksum in the index for that version
     #[error("checksum mismatch for {name}-{version}.crate")]
@@ -22,7 +23,7 @@ pub enum LocalRegistryError {
         /// The name of the crate
         name: String,
         /// The specific crate version
-        version: semver::Version,
+        version: SmolStr,
     },
 }
 
@@ -90,14 +91,13 @@ impl LocalRegistry {
                 indexed.get(crate_name).unwrap()
             };
 
-            let version = version.parse()?;
             let index_vers = index_entry
                 .versions
                 .iter()
                 .find(|kv| kv.version == version)
                 .ok_or_else(|| LocalRegistryError::MissingVersion {
                     name: crate_name.to_owned(),
-                    version: version.clone(),
+                    version: version.into(),
                 })?;
 
             // Read the crate file from disk and verify its checksum matches
@@ -108,7 +108,7 @@ impl LocalRegistry {
             {
                 return Err(LocalRegistryError::ChecksumMismatch {
                     name: crate_name.to_owned(),
-                    version,
+                    version: version.into(),
                 }
                 .into());
             }

@@ -24,7 +24,7 @@ fn builds_local_registry() {
 
     struct IndexPkg {
         ik: tame_index::IndexKrate,
-        versions: Vec<semver::Version>,
+        versions: Vec<smol_str::SmolStr>,
     }
 
     for pkg in &md.packages {
@@ -43,7 +43,7 @@ fn builds_local_registry() {
             }
         });
 
-        ip.versions.push(pkg.version.clone());
+        ip.versions.push(pkg.version.to_string().into());
     }
 
     let client = local::builder::Client::build(reqwest::blocking::ClientBuilder::new()).unwrap();

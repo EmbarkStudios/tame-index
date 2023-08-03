@@ -67,7 +67,7 @@ pub fn fake_krate(name: &str, num_versions: u8) -> IndexKrate {
             _ => unreachable!(),
         }
 
-        let iv = tame_index::IndexVersion::fake(name, version.clone());
+        let iv = tame_index::IndexVersion::fake(name, version.to_string());
         versions.push(iv);
     }
 

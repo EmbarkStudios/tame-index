@@ -200,6 +200,6 @@ fn end_to_end() {
     spdx_krate
         .versions
         .iter()
-        .find(|iv| iv.version == semver::Version::new(0, 10, 1))
+        .find(|iv| iv.version == "0.10.1")
         .expect("failed to find expected version");
 }
