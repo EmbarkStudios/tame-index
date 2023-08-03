@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.3.0] - 2023-08-03
 ### Changed
 - [PR#10](https://github.com/EmbarkStudios/tame-index/pull/10) unfortunately had to [relax the constraint](https://github.com/rustsec/rustsec/issues/759) that crate versions in an index are always parsable as `semver::Version`.
 
@@ -61,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.2.5...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/EmbarkStudios/tame-index/compare/0.2.5...0.3.0
 [0.2.5]: https://github.com/EmbarkStudios/tame-index/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/EmbarkStudios/tame-index/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/EmbarkStudios/tame-index/compare/0.2.2...0.2.3
