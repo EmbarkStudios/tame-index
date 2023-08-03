@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#10](https://github.com/EmbarkStudios/tame-index/pull/10) unfortunately had to [relax the constraint](https://github.com/rustsec/rustsec/issues/759) that crate versions in an index are always parsable as `semver::Version`.
+
 ## [0.2.5] - 2023-08-02
 ### Fixed
 - [PR#9](https://github.com/EmbarkStudios/tame-index/pull/9) resolved [#8](https://github.com/EmbarkStudios/tame-index/issues/8) by ensuring (valid) non-official cargo build version output can also be parsed.
