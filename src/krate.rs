@@ -48,10 +48,10 @@ pub struct IndexVersion {
 impl IndexVersion {
     /// Test functionality
     #[doc(hidden)]
-    pub fn fake(name: &str, version: Version) -> Self {
+    pub fn fake(name: &str, version: impl Into<SmolStr>) -> Self {
         Self {
             name: name.into(),
-            version: version.to_string().into(),
+            version: version.into(),
             deps: Arc::new([]),
             features: Arc::default(),
             features2: None,
@@ -499,5 +499,35 @@ impl Serialize for Chksum {
         let mut raw = [0u8; 64];
         let s = crate::utils::encode_hex(&self.0, &mut raw);
         serializer.serialize_str(s)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn krate_versions() {
+        use super::IndexVersion as iv;
+        let ik = super::IndexKrate {
+            versions: vec![
+                iv::fake("vers", "0.1.0"),
+                iv::fake("vers", "0.1.1"),
+                iv::fake("vers", "0.1.0"),
+                iv::fake("vers", "0.2.0"),
+                iv::fake("vers", "0.3.0"),
+                // These are ordered this way to actually test the methods correctly
+                iv::fake("vers", "0.4.0"),
+                iv::fake("vers", "0.4.0-alpha.00"),
+                {
+                    let mut iv = iv::fake("vers", "0.5.0");
+                    iv.yanked = true;
+                    iv
+                },
+            ],
+        };
+
+        assert_eq!(ik.earliest_version().version, "0.1.0");
+        assert_eq!(ik.most_recent_version().version, "0.5.0");
+        assert_eq!(ik.highest_version().version, "0.5.0");
+        assert_eq!(ik.highest_normal_version().unwrap().version, "0.4.0");
     }
 }
