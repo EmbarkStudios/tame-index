@@ -180,4 +180,8 @@ pub enum HttpError {
     /// A [`http::Error`]
     #[error(transparent)]
     Http(#[from] http::Error),
+    /// Unable to complete an async request for an `AsyncRemoteSparseIndex` within
+    /// the user allotted time
+    #[error("request could not be completed in the allotted timeframe")]
+    Timeout,
 }
