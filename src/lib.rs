@@ -23,4 +23,6 @@ pub mod external {
     pub use gix;
     #[cfg(any(feature = "sparse", feature = "local-builder"))]
     pub use reqwest;
+    #[cfg(any(feature = "sparse", feature = "local-builder"))]
+    pub use tokio;
 }
