@@ -207,7 +207,7 @@ impl AsyncRemoteSparseIndex {
         let (tx, rx) = crossbeam_channel::unbounded();
         while let Some(res) = tasks.join_next().await {
             let Ok(res) = res else { continue; };
-            tx.send(res);
+            let _ = tx.send(res);
         }
 
         drop(tx);
