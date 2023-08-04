@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 ## [0.3.1] - 2023-08-04
+### Added
+- [PR#11](https://github.com/EmbarkStudios/tame-index/pull/11) added `RemoteSparseIndex::krates`, `AsyncRemoteSparseIndex::krates`, and `AsyncRemoteSparseIndex::krates_blocking` as helper methods for improving throughput when fetching index entries for many crates.
+
 ## [0.3.0] - 2023-08-03
 ### Changed
 - [PR#10](https://github.com/EmbarkStudios/tame-index/pull/10) unfortunately had to [relax the constraint](https://github.com/rustsec/rustsec/issues/759) that crate versions in an index are always parsable as `semver::Version`.
