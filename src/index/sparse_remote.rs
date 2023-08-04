@@ -204,22 +204,33 @@ impl AsyncRemoteSparseIndex {
             }
         }
 
+        let (tx, rx) = crossbeam_channel::unbounded();
         while let Some(res) = tasks.join_next().await {
-            let Ok((kname, res)) = res else { continue; };
-
-            let res = res.and_then(|res| {
-                let name = kname
-                    .as_str()
-                    .try_into()
-                    .expect("this was already validated");
-                self.index
-                    .parse_remote_response(name, res, write_cache_entries)
-            });
-
-            results.insert(kname, res);
+            let Ok(res) = res else { continue; };
+            tx.send(res);
         }
 
-        results
+        drop(tx);
+
+        let results = std::sync::Mutex::new(results);
+        rayon::scope(|s| {
+            while let Ok((kname, res)) = rx.recv() {
+                s.spawn(|_s| {
+                    let res = res.and_then(|res| {
+                        let name = kname
+                            .as_str()
+                            .try_into()
+                            .expect("this was already validated");
+                        self.index
+                            .parse_remote_response(name, res, write_cache_entries)
+                    });
+
+                    results.lock().unwrap().insert(kname, res);
+                });
+            }
+        });
+
+        results.into_inner().unwrap()
     }
 
     /// A non-async version of [`Self::krates`]
