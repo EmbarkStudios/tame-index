@@ -44,6 +44,7 @@ pub fn write_fetch_head(
                 full_ref_name,
                 target,
                 object,
+                ..
             } = rref else { return None; };
 
             (full_ref_name == "HEAD").then_some((target, object))
