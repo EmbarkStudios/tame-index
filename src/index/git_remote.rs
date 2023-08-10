@@ -65,15 +65,34 @@ impl RemoteGitIndex {
             mapping.reduced = open_with_complete_config.clone();
             mapping.full = open_with_complete_config.clone();
 
-            let _lock = gix::lock::Marker::acquire_to_hold_resource(
-                index.cache.path.with_extension("tame-index"),
-                gix::lock::acquire::Fail::AfterDurationWithBackoff(std::time::Duration::from_secs(
-                    60 * 10, /* 10 minutes */
-                )),
-                Some(std::path::PathBuf::from_iter(Some(
+            // Lock the directory with the git repo checkout so that several processes don't trample each other
+            const LOCK_WAIT_MINUTES: u64 = 10;
+            let path = &index.cache.path;
+            let _lock = {
+                let boundary_dir = Some(std::path::PathBuf::from_iter(Some(
                     std::path::Component::RootDir,
-                ))),
-            )?;
+                )));
+
+                // Attempt to acquire the lock without waiting. If this fails, print a message and wait.
+                // This is done to avoid "hanging" without a clearly communicated reason.
+                match gix::lock::Marker::acquire_to_hold_resource(
+                    path.with_extension("tame-index"),
+                    gix::lock::acquire::Fail::Immediately,
+                    boundary_dir.clone(),
+                ) {
+                    Ok(marker) => marker,
+                    Err(e) => {
+                        println!("Could not acquire the lock on git repository at {path:?}: {e}. Waiting for up to {LOCK_WAIT_MINUTES} minutes to acquire the lock.");
+                        gix::lock::Marker::acquire_to_hold_resource(
+                            path.with_extension("tame-index"),
+                            gix::lock::acquire::Fail::AfterDurationWithBackoff(
+                                std::time::Duration::from_secs(60 * LOCK_WAIT_MINUTES),
+                            ),
+                            boundary_dir,
+                        )?
+                    }
+                }
+            };
 
             // Attempt to open the repository, if it fails for any reason,
             // attempt to perform a fresh clone instead
