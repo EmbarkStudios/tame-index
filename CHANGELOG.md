@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#13](https://github.com/EmbarkStudios/tame-index/pull/13) fixed a bug where git repository url canonicalization was incorrect if the url was not a github.com url that ended with .git.
+
 ## [0.3.1] - 2023-08-04
 ### Added
 - [PR#11](https://github.com/EmbarkStudios/tame-index/pull/11) added `RemoteSparseIndex::krates`, `AsyncRemoteSparseIndex::krates`, and `AsyncRemoteSparseIndex::krates_blocking` as helper methods for improving throughput when fetching index entries for many crates.

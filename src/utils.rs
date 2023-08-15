@@ -82,8 +82,7 @@ pub fn canonicalize_url(url: &str) -> Result<String, Error> {
         canonical.pop();
     }
 
-    if canonical.contains("github.com/") && canonical.ends_with(".git") {
-        // Only GitHub (crates.io) repositories have their .git suffix truncated
+    if canonical.ends_with(".git") {
         canonical.truncate(canonical.len() - 4);
     }
 
@@ -296,6 +295,16 @@ mod test {
 
         assert_eq!("https://github.com/Rust-Lang/crates.io-index", canonical);
         assert_eq!("github.com-016fae53232cc64d", dir_name);
+
+        // cargo treats github.com specially (eg lowercasing), but it _always_
+        // strips the .git extension if it exists
+        let super::UrlDir {
+            dir_name,
+            canonical,
+        } = url_to_local_dir("git+https://gitlab.com/gilrs-project/gilrs.git?rev=1bbec17").unwrap();
+
+        assert_eq!("https://gitlab.com/gilrs-project/gilrs", canonical);
+        assert_eq!("gilrs-7804d1d6a17891c9", dir_name);
     }
 
     #[test]
