@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.3.2] - 2023-08-15
 ### Fixed
 - [PR#13](https://github.com/EmbarkStudios/tame-index/pull/13) fixed a bug where git repository url canonicalization was incorrect if the url was not a github.com url that ended with .git.
 
@@ -69,7 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.3.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.3.2...HEAD
+[0.3.2]: https://github.com/EmbarkStudios/tame-index/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/EmbarkStudios/tame-index/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/EmbarkStudios/tame-index/compare/0.2.5...0.3.0
 [0.2.5]: https://github.com/EmbarkStudios/tame-index/compare/0.2.4...0.2.5
