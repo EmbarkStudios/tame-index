@@ -51,7 +51,11 @@ impl RemoteGitIndex {
 
     /// Creates a new [`Self`] that allows showing of progress of the the potential
     /// fetch if the disk location is empty, as well as allowing interruption
-    /// of the fetch operation
+    /// of the fetch operation.
+    ///
+    /// Regardless of the `lock_policy`, this function relies on `panic = unwind` to avoid leaving stale locks
+    /// if the process is interrupted with Ctrl+C. To support `panic = abort` you also need to register
+    /// a signal handler that sets `should_interrupt` to `true`.
     pub fn with_options<P>(
         mut index: GitIndex,
         progress: P,
