@@ -20,12 +20,24 @@ impl RemoteGitIndex {
     ///
     /// Note that if a repository does not exist at the local disk path of the
     /// provided [`GitIndex`], a full clone will be performed.
+    ///
+    /// ## Locking
+    /// This function will wait to aquire the lock on the local directory for up to 10 minutes,
+    /// and then return `GitError::Lock` if it is still locked by another thread or process.
+    /// You can customize this behavior using [Self::with_options].
+    ///
+    /// Regardless of the timeout, this function relies on `panic = unwind` to avoid leaving stale locks
+    /// if the process is interrupted with Ctrl+C. To support `panic = abort` you also need to register
+    /// the `gix` signal handler to clean up the locks, see [`gix::interrupt::init_handler`].
     #[inline]
     pub fn new(index: GitIndex) -> Result<Self, Error> {
         Self::with_options(
             index,
             gix::progress::Discard,
             &gix::interrupt::IS_INTERRUPTED,
+            gix::lock::acquire::Fail::AfterDurationWithBackoff(std::time::Duration::from_secs(
+                60 * 10, /* 10 minutes */
+            )),
         )
     }
 
@@ -39,11 +51,16 @@ impl RemoteGitIndex {
 
     /// Creates a new [`Self`] that allows showing of progress of the the potential
     /// fetch if the disk location is empty, as well as allowing interruption
-    /// of the fetch operation
+    /// of the fetch operation.
+    ///
+    /// Regardless of the `lock_policy`, this function relies on `panic = unwind` to avoid leaving stale locks
+    /// if the process is interrupted with Ctrl+C. To support `panic = abort` you also need to register
+    /// a signal handler that sets `should_interrupt` to `true`.
     pub fn with_options<P>(
         mut index: GitIndex,
         progress: P,
         should_interrupt: &AtomicBool,
+        lock_policy: gix::lock::acquire::Fail,
     ) -> Result<Self, Error>
     where
         P: gix::Progress,
@@ -67,9 +84,7 @@ impl RemoteGitIndex {
 
             let _lock = gix::lock::Marker::acquire_to_hold_resource(
                 index.cache.path.with_extension("tame-index"),
-                gix::lock::acquire::Fail::AfterDurationWithBackoff(std::time::Duration::from_secs(
-                    60 * 10, /* 10 minutes */
-                )),
+                lock_policy,
                 Some(std::path::PathBuf::from_iter(Some(
                     std::path::Component::RootDir,
                 ))),
