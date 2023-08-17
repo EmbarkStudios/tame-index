@@ -20,12 +20,20 @@ impl RemoteGitIndex {
     ///
     /// Note that if a repository does not exist at the local disk path of the
     /// provided [`GitIndex`], a full clone will be performed.
+    ///
+    /// ## Locking
+    /// This function will wait to aquire the lock on the local directory for up to 10 minutes,
+    /// and then return `GitError::Lock` if it is still locked by another thread or process.
+    /// You can customize this behavior using [Self::with_options].
     #[inline]
     pub fn new(index: GitIndex) -> Result<Self, Error> {
         Self::with_options(
             index,
             gix::progress::Discard,
             &gix::interrupt::IS_INTERRUPTED,
+            gix::lock::acquire::Fail::AfterDurationWithBackoff(std::time::Duration::from_secs(
+                60 * 10, /* 10 minutes */
+            )),
         )
     }
 
@@ -44,6 +52,7 @@ impl RemoteGitIndex {
         mut index: GitIndex,
         progress: P,
         should_interrupt: &AtomicBool,
+        lock_policy: gix::lock::acquire::Fail,
     ) -> Result<Self, Error>
     where
         P: gix::Progress,
@@ -67,9 +76,7 @@ impl RemoteGitIndex {
 
             let _lock = gix::lock::Marker::acquire_to_hold_resource(
                 index.cache.path.with_extension("tame-index"),
-                gix::lock::acquire::Fail::AfterDurationWithBackoff(std::time::Duration::from_secs(
-                    60 * 10, /* 10 minutes */
-                )),
+                lock_policy,
                 Some(std::path::PathBuf::from_iter(Some(
                     std::path::Component::RootDir,
                 ))),
