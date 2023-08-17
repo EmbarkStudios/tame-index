@@ -25,6 +25,10 @@ impl RemoteGitIndex {
     /// This function will wait to aquire the lock on the local directory for up to 10 minutes,
     /// and then return `GitError::Lock` if it is still locked by another thread or process.
     /// You can customize this behavior using [Self::with_options].
+    ///
+    /// Regardless of the timeout, this function relies on `panic = unwind` to avoid leaving stale locks
+    /// if the process is interrupted with Ctrl+C. To support `panic = abort` you also need to register
+    /// the `gix` signal handler to clean up the locks, see [`gix::interrupt::init_handler`].
     #[inline]
     pub fn new(index: GitIndex) -> Result<Self, Error> {
         Self::with_options(
