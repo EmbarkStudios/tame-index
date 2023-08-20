@@ -10,15 +10,18 @@ homepage = "https://github.com/EmbarkStudios/tame-index"
 repository = "https://github.com/EmbarkStudios/tame-index"
 
 [features]
-default = []
+default = ["reqwest?/rustls-tls-webpki-roots"]
 # Enables the built-in support for fetching and reading a git registry index
-git = ["dep:gix"]
+git = ["dep:gix", "dep:reqwest"]
 # Enables the built-in support for requesting index entries from a HTTP sparse registry index
 sparse = ["dep:reqwest", "dep:tokio", "dep:rayon", "dep:crossbeam-channel"]
 # Enables local registry support
 local = ["dep:sha2", "dep:bytes"]
 # Enables helpers for building a local registry
 local-builder = ["local", "dep:reqwest"]
+# Enables the use of OS native certificate store.
+# Should be used with `default-features = false` to also disable webpki-roots, which is activated by default.
+native-certs = ["reqwest?/rustls-tls-native-roots"]
 
 [dependencies]
 bytes = { version = "1.4", optional = true }
@@ -61,14 +64,15 @@ default-features = false
 features = [
     "max-performance-safe",
     "blocking-network-client",
-    "blocking-http-transport-reqwest-rust-tls",
+    "blocking-http-transport-reqwest",
+    "reqwest-for-configuration-only",
 ]
 
 [dependencies.reqwest]
 optional = true
 version = "0.11"
 default-features = false
-features = ["blocking", "gzip", "rustls-tls"]
+features = ["blocking", "gzip"]
 
 [dev-dependencies]
 cargo_metadata = "0.17"
