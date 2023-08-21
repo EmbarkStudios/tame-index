@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#15](https://github.com/EmbarkStudios/tame-index/pull/15) added the `native-certs` feature to be able to use the OS certificate store instead of `webpki-roots`. Thanks [@Shnatsel](https://github.com/Shnatsel)!
+
 ## [0.4.0] - 2023-08-18
 ### Changed
 - [PR#14](https://github.com/EmbarkStudios/tame-index/pull/14) added the ability to specify the repository lock policy when calling `RemoteGitIndex::with_options`. Thanks [@Shnatsel](https://github.com/Shnatsel)!
