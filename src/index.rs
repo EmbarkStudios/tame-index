@@ -101,6 +101,7 @@ impl IndexConfig {
 use crate::Error;
 
 /// Provides simpler access to the cache for an index, regardless of the registry kind
+#[non_exhaustive]
 pub enum ComboIndexCache {
     /// A git index
     Git(GitIndex),

@@ -6,6 +6,7 @@ use crate::{
 };
 
 /// A wrapper around either a [`RemoteGitIndex`] or [`RemoteSparseIndex`]
+#[non_exhaustive]
 pub enum ComboIndex {
     /// A standard git based registry index. No longer the default for crates.io
     /// as of 1.70.0
