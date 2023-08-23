@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.5.1] - 2023-08-23
 ### Added
 - [PR#20](https://github.com/EmbarkStudios/tame-index/pull/20) publicly exposed `tame_index::external::http` for easier downstream usage.
 
@@ -88,7 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.5.1...HEAD
+[0.5.1]: https://github.com/EmbarkStudios/tame-index/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/EmbarkStudios/tame-index/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/EmbarkStudios/tame-index/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/EmbarkStudios/tame-index/compare/0.3.2...0.4.0
