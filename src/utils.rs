@@ -185,6 +185,7 @@ pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
 
         // trim port
         let host = host.split(':').next().unwrap();
+        let host = host.split_once('@').map_or(host, |(_user, host)| host);
 
         (format!("{host}-{ident}"), url.to_owned())
     };
@@ -305,6 +306,17 @@ mod test {
 
         assert_eq!("https://gitlab.com/gilrs-project/gilrs", canonical);
         assert_eq!("gilrs-7804d1d6a17891c9", dir_name);
+
+        let super::UrlDir {
+            dir_name,
+            canonical,
+        } = url_to_local_dir("ssh://git@github.com/rust-lang/crates.io-index.git").unwrap();
+
+        assert_eq!(
+            "ssh://git@github.com/rust-lang/crates.io-index.git",
+            canonical
+        );
+        assert_eq!("github.com-01dba724c7458575", dir_name);
     }
 
     #[test]
