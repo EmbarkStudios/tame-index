@@ -82,6 +82,7 @@ tiny-bench = "0.3"
 
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev.package.sha2]
 opt-level = 3
