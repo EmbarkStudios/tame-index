@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#22](https://github.com/EmbarkStudios/tame-index/pull/22) fixed an issue where ssh index urls would be mapped to the incorrect local directory. This issue was raised in [cargo-deny](https://github.com/EmbarkStudios/cargo-deny/issues/548).
+
 ## [0.5.2] - 2023-08-23
 ### Fixed
 - [`d9cb55f`] fixed and issue with docs.rs documentation building.
