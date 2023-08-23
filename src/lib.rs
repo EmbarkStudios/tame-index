@@ -22,6 +22,7 @@ pub use krate_name::KrateName;
 pub mod external {
     #[cfg(feature = "git")]
     pub use gix;
+    pub use http;
     #[cfg(any(feature = "sparse", feature = "local-builder"))]
     pub use reqwest;
     #[cfg(any(feature = "sparse", feature = "local-builder"))]
