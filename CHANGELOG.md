@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#20](https://github.com/EmbarkStudios/tame-index/pull/20) publicly exposed `tame_index::external::http` for easier downstream usage.
+
 ## [0.5.0] - 2023-08-23
 ### Fixed
 - [PR#18](https://github.com/EmbarkStudios/tame-index/pull/18) resolved [#16](https://github.com/EmbarkStudios/tame-index/issues/16) by marking `ComboIndexCache` and `ComboIndex` as `#[non_exhaustive]`. This avoids build breaks if the `local` feature is enabled in one transitive dependency and not in another, as much as I hate `non_exhaustive`.
