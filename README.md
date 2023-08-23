@@ -18,22 +18,12 @@
 [![Build status](https://github.com/EmbarkStudios/tame-index/workflows/CI/badge.svg)](https://github.com/EmbarkStudios/tame-index/actions)
 </div>
 
-## You probably want to use [`crates-index`][0]
-
-This crate is a hard fork of [`crates-index`][0] to fit the use cases of [`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny) and [`cargo-fetcher`](https://github.com/EmbarkStudios/cargo-fetcher), if you are looking for a crate to access a cargo registry index, you would be well served by using [`crates-index`][0] instead.
-
 ## Differences from [`crates-index`][0]
 
-If you still want to use this crate instead, there are some differences to be aware of. Though note any of these may change in the future as [`crates-index`][0] and this crate evolve.
-
-1. Git registry support is optional, gated behind the `git` feature flag.
-1. Git functionality is provided by [`gix`](https://crates.io/crates/gix) instead of [`git2`](https://crates.io/crates/git2)
 1. The API exposes enough pieces where an alternative git implementation can be used if `gix` is not to your liking.
-1. Sparse index support is optional, gated behind the `sparse` feature flag.
-1. Sparse HTTP functionality is provided by the [`reqwest`](https://crates.io/crates/reqwest) crate
-1. Support for creating HTTP requests and parsing HTTP responses is still available when the `sparse` feature is not enabled if you want to use a different HTTP client than `reqwest`
+1. Sparse index support via [`reqwest`](https://crates.io/crates/reqwest) is optional, gated behind the `sparse` feature flag.
 1. Local cache files are always supported regardless of features enabled
-1. Functionality for determining the local index location for a remote registry URL is exposed in the public API
+1. `ComboIndexCache` (local cache files only) and `ComboIndex` (cache + remote capabilities) are provided to wrap git indices, sparse indices, or local registries depending on the the index URL.
 1. Functionality for writing cache entries to the local index cache is exposed in the public API
 1. [`Local Registry`](https://doc.rust-lang.org/cargo/reference/source-replacement.html#local-registry-sources) support is available behind the `local` feature flag
 1. Building of local registries is available behind the `local-builder` feature flag
