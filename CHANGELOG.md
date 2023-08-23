@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.5.0] - 2023-08-23
 ### Fixed
 - [PR#18](https://github.com/EmbarkStudios/tame-index/pull/18) resolved [#16](https://github.com/EmbarkStudios/tame-index/issues/16) by marking `ComboIndexCache` and `ComboIndex` as `#[non_exhaustive]`. This avoids build breaks if the `local` feature is enabled in one transitive dependency and not in another, as much as I hate `non_exhaustive`.
 
@@ -84,7 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.4.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/EmbarkStudios/tame-index/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/EmbarkStudios/tame-index/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/EmbarkStudios/tame-index/compare/0.3.2...0.4.0
 [0.3.2]: https://github.com/EmbarkStudios/tame-index/compare/0.3.1...0.3.2
