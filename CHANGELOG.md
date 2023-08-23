@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [`d9cb55f`] fixed and issue with docs.rs documentation building.
+
 ## [0.5.1] - 2023-08-23
 ### Added
 - [PR#20](https://github.com/EmbarkStudios/tame-index/pull/20) publicly exposed `tame_index::external::http` for easier downstream usage.
