@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#18](https://github.com/EmbarkStudios/tame-index/pull/18) resolved [#16](https://github.com/EmbarkStudios/tame-index/issues/16) by marking `ComboIndexCache` and `ComboIndex` as `#[non_exhaustive]`. This avoids build breaks if the `local` feature is enabled in one transitive dependency and not in another, as much as I hate `non_exhaustive`.
+
+### Changed
+- [PR#18](https://github.com/EmbarkStudios/tame-index/pull/18) changed `SparseIndex::make_remote_request` to take an optional [ETag](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag), completely avoiding disk I/O, which allows `SparseIndex` to be used for making and parsing requests without worrying about cargo's global package lock.
+
 ## [0.4.1] - 2023-08-21
 ### Added
 - [PR#15](https://github.com/EmbarkStudios/tame-index/pull/15) added the `native-certs` feature to be able to use the OS certificate store instead of `webpki-roots`. Thanks [@Shnatsel](https://github.com/Shnatsel)!
