@@ -31,7 +31,7 @@ impl RemoteSparseIndex {
         name: KrateName<'_>,
         write_cache_entry: bool,
     ) -> Result<Option<IndexKrate>, Error> {
-        let req = self.index.make_remote_request(name)?;
+        let req = self.index.make_remote_request(name, None)?;
         let req = req.try_into()?;
 
         let res = self.client.execute(req)?;
@@ -109,7 +109,7 @@ impl AsyncRemoteSparseIndex {
         name: KrateName<'_>,
         write_cache_entry: bool,
     ) -> Result<Option<IndexKrate>, Error> {
-        let req = self.index.make_remote_request(name)?.try_into()?;
+        let req = self.index.make_remote_request(name, None)?.try_into()?;
         let res = Self::exec_request(&self.client, req).await?;
 
         self.index
@@ -181,7 +181,7 @@ impl AsyncRemoteSparseIndex {
             match kname
                 .as_str()
                 .try_into()
-                .and_then(|name| Ok(self.index.make_remote_request(name)?.try_into()?))
+                .and_then(|name| Ok(self.index.make_remote_request(name, None)?.try_into()?))
             {
                 Ok(req) => {
                     let client = self.client.clone();

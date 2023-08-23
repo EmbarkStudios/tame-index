@@ -79,6 +79,10 @@ impl SparseIndex {
     /// Creates an HTTP request that can be sent via your HTTP client of choice
     /// to retrieve the current metadata for the specified crate
     ///
+    /// If specified, the etag is used instead of the possible etag stored in
+    /// a local cache entry, resulting in no disk I/O being performed by this
+    /// method
+    ///
     /// See [`Self::parse_remote_response`] processing the response from the remote
     /// index
     ///
@@ -87,6 +91,7 @@ impl SparseIndex {
     pub fn make_remote_request(
         &self,
         name: KrateName<'_>,
+        etag: Option<&str>,
     ) -> Result<http::Request<&'static [u8]>, Error> {
         use http::header;
 
@@ -145,7 +150,15 @@ impl SparseIndex {
                 None
             };
 
-            let _ = set_cache_version(headers);
+            if let Some(etag) = etag {
+                let hv =
+                    header::HeaderValue::from_str(etag.trim()).map_err(crate::HttpError::from)?;
+                headers.insert(header::IF_NONE_MATCH, hv);
+            } else {
+                // Use the etag (or last modified, though crates.io does not use this AFAICT)
+                // from the cache entry if it exists
+                let _ = set_cache_version(headers);
+            }
         }
 
         const EMPTY: &[u8] = &[];

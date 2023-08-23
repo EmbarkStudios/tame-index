@@ -46,20 +46,14 @@ deny = [{ name = "openssl" }, { name = "curl" }]
 skip = [
     # several users of this old version
     { name = "bitflags", version = "=1.3.2" },
-    # tempfile uses an old version
-    { name = "fastrand", version = "=1.9.0" },
     # imara-diff uses an old version
     { name = "hashbrown", version = "=0.12.3" },
-    # trust-dns-proto uses an old version
-    { name = "idna", version = "=0.2.3" },
     # toml-edit is user a newer version :p
     { name = "indexmap", version = "=1.9.3" },
     # trust-dns-resolver pulls in a new version than the rest of them use (including itself)
     { name = "socket2", version = "=0.4.9" },
     # A bunch of users still of syn 1.0 :p
     { name = "syn", version = "=1.0.109" },
-    # Reqwest depends on 2 versions :p
-    { name = "winreg", version = "=0.10.1" },
 ]
 skip-tree = []
 

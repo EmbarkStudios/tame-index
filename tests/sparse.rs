@@ -29,7 +29,7 @@ fn make_request_without_cache() {
     let index = crates_io(env!("CARGO_MANIFEST_DIR"));
 
     let req = index
-        .make_remote_request("serde".try_into().unwrap())
+        .make_remote_request("serde".try_into().unwrap(), None)
         .unwrap();
 
     let hdrs = req.headers();
@@ -61,7 +61,15 @@ fn make_request_with_cache() {
             .unwrap();
 
         let req = index
-            .make_remote_request("etag-krate".try_into().unwrap())
+            .make_remote_request("etag-krate".try_into().unwrap(), None)
+            .unwrap();
+
+        assert_eq!(req.headers().get(header::IF_NONE_MATCH).unwrap(), ETAG);
+    }
+
+    {
+        let req = index
+            .make_remote_request("etag-specified-krate".try_into().unwrap(), Some(ETAG))
             .unwrap();
 
         assert_eq!(req.headers().get(header::IF_NONE_MATCH).unwrap(), ETAG);
@@ -78,7 +86,7 @@ fn make_request_with_cache() {
             .unwrap();
 
         let req = index
-            .make_remote_request("modified-krate".try_into().unwrap())
+            .make_remote_request("modified-krate".try_into().unwrap(), None)
             .unwrap();
 
         assert_eq!(req.headers().get(header::IF_MODIFIED_SINCE).unwrap(), DATE);

@@ -180,6 +180,9 @@ pub enum HttpError {
     /// A [`http::Error`]
     #[error(transparent)]
     Http(#[from] http::Error),
+    /// A string could not be parsed as a valid header value
+    #[error(transparent)]
+    InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
     /// Unable to complete an async request for an `AsyncRemoteSparseIndex` within
     /// the user allotted time
     #[error("request could not be completed in the allotted timeframe")]
