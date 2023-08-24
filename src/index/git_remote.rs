@@ -238,7 +238,9 @@ impl RemoteGitIndex {
             return Ok(Some(cached));
         }
 
-        let Some(blob) = self.read_blob(&name.relative_path(None))? else { return Ok(None) };
+        let Some(blob) = self.read_blob(&name.relative_path(None))? else {
+            return Ok(None);
+        };
 
         let krate = IndexKrate::from_slice(&blob.data)?;
         if write_cache_entry {
@@ -263,7 +265,12 @@ impl RemoteGitIndex {
             .tree()?;
 
         let mut buf = Vec::new();
-        let Some(entry) = tree.lookup_entry_by_path(path, &mut buf).map_err(|err| GitError::BlobLookup(Box::new(err)))? else { return Ok(None) };
+        let Some(entry) = tree
+            .lookup_entry_by_path(path, &mut buf)
+            .map_err(|err| GitError::BlobLookup(Box::new(err)))?
+        else {
+            return Ok(None);
+        };
         let blob = entry
             .object()
             .map_err(|err| GitError::BlobLookup(Box::new(err)))?;
@@ -294,11 +301,15 @@ impl RemoteGitIndex {
     /// cannot know the blob id.
     #[inline]
     pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
-        let Some(cached) = self.index.cache.read_cache_file(name)? else { return Ok(None) };
+        let Some(cached) = self.index.cache.read_cache_file(name)? else {
+            return Ok(None);
+        };
         let valid = crate::index::cache::ValidCacheEntry::read(&cached)?;
 
         if Some(valid.revision) != self.index.head_commit() {
-            let Some(blob) = self.read_blob(&name.relative_path(None))? else { return Ok(None) };
+            let Some(blob) = self.read_blob(&name.relative_path(None))? else {
+                return Ok(None);
+            };
 
             let mut hex_id = [0u8; 40];
             let gix::ObjectId::Sha1(sha1) = blob.id;

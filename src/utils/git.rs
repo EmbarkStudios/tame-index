@@ -38,14 +38,19 @@ pub fn write_fetch_head(
         .mappings
         .iter()
         .find_map(|mapping| {
-            let gix::remote::fetch::Source::Ref(rref) = &mapping.remote else { return None; };
+            let gix::remote::fetch::Source::Ref(rref) = &mapping.remote else {
+                return None;
+            };
 
             let Ref::Symbolic {
                 full_ref_name,
                 target,
                 object,
                 ..
-            } = rref else { return None; };
+            } = rref
+            else {
+                return None;
+            };
 
             (full_ref_name == "HEAD").then_some((target, object))
         })
@@ -70,7 +75,9 @@ pub fn write_fetch_head(
         let remote_name = remote
             .name()
             .and_then(|n| {
-                let gix::remote::Name::Symbol(name) = n else { return None; };
+                let gix::remote::Name::Symbol(name) = n else {
+                    return None;
+                };
                 Some(name.as_ref())
             })
             .unwrap_or("origin");
