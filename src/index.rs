@@ -241,8 +241,8 @@ mod test {
             "https://complex.io/ohhi/embark/rust/cargo/2/aB/aB/2-0.1.0"
         );
         assert_eq!(
-            ic.download_url(kn!("aBc"), "0.1.0"),
-            "https://complex.io/ohhi/embark/rust/cargo/3/a/aBc/aBc/3/a-0.1.0"
+            ic.download_url(kn!("ABc"), "0.1.0"),
+            "https://complex.io/ohhi/embark/rust/cargo/3/a/ABc/ABc/3/A-0.1.0"
         );
         assert_eq!(
             ic.download_url(kn!("aBc-123"), "0.1.0"),

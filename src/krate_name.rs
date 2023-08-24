@@ -249,6 +249,10 @@ impl<'name> KrateName<'name> {
         rel_path.push(sep);
         rel_path.push_str(name);
 
+        // A valid krate name is ASCII only, we don't need to worry about
+        // lowercasing utf-8
+        rel_path.make_ascii_lowercase();
+
         rel_path
     }
 }
@@ -389,8 +393,9 @@ mod test {
         assert_eq!(rp("a"), "1/a");
         assert_eq!(rp("ab"), "2/ab");
         assert_eq!(rp("abc"), "3/a/abc");
-        assert_eq!(rp("AbCd"), "Ab/Cd/AbCd");
+        assert_eq!(rp("AbCd"), "ab/cd/abcd");
         assert_eq!(rp("normal"), "no/rm/normal");
         assert_eq!(rp("_boop-"), "_b/oo/_boop-");
+        assert_eq!(rp("Inflector"), "in/fl/inflector");
     }
 }
