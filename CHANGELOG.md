@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.5.4] - 2023-08-24
 ### Fixed
 - [PR#24](https://github.com/EmbarkStudios/tame-index/pull/24) resolved [#23](https://github.com/EmbarkStudios/tame-index/issues/23) by fixing a bug where index cache paths were not lower cased as cargo does.
 
@@ -100,7 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.5.3...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.5.4...HEAD
+[0.5.4]: https://github.com/EmbarkStudios/tame-index/compare/0.5.3...0.5.4
 [0.5.3]: https://github.com/EmbarkStudios/tame-index/compare/0.5.2...0.5.3
 [0.5.2]: https://github.com/EmbarkStudios/tame-index/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/EmbarkStudios/tame-index/compare/0.5.0...0.5.1
