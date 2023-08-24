@@ -67,14 +67,22 @@ impl LocalRegistry {
         let mut indexed = std::collections::BTreeMap::new();
 
         for entry in rd {
-            let Ok(entry) = entry else { continue; };
+            let Ok(entry) = entry else {
+                continue;
+            };
             if entry.file_type().map_or(true, |ft| !ft.is_file()) {
                 continue;
             }
-            let Ok(path) = PathBuf::from_path_buf(entry.path()) else { continue; };
+            let Ok(path) = PathBuf::from_path_buf(entry.path()) else {
+                continue;
+            };
 
-            let Some(fname) = path.file_name() else { continue; };
-            let Some((crate_name, version)) = crate_file_components(fname) else { continue; };
+            let Some(fname) = path.file_name() else {
+                continue;
+            };
+            let Some((crate_name, version)) = crate_file_components(fname) else {
+                continue;
+            };
 
             let index_entry = if let Some(ie) = indexed.get(crate_name) {
                 ie

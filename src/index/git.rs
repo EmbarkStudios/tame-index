@@ -80,7 +80,9 @@ impl GitIndex {
         krate: &IndexKrate,
         blob_id: Option<&str>,
     ) -> Result<Option<PathBuf>, Error> {
-        let Some(id) = blob_id.or_else(|| self.head_commit()) else { return Ok(None); };
+        let Some(id) = blob_id.or_else(|| self.head_commit()) else {
+            return Ok(None);
+        };
         self.cache.write_to_cache(krate, id).map(Some)
     }
 }

@@ -228,7 +228,9 @@ impl IndexCache {
         name: KrateName<'_>,
         revision: Option<&str>,
     ) -> Result<Option<IndexKrate>, Error> {
-        let Some(contents) = self.read_cache_file(name)? else { return Ok(None) };
+        let Some(contents) = self.read_cache_file(name)? else {
+            return Ok(None);
+        };
 
         let valid = ValidCacheEntry::read(&contents)?;
         valid.to_krate(revision)
