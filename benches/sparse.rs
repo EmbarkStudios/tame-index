@@ -19,7 +19,6 @@ fn main() {
         tame_index::index::RemoteSparseIndex::new(
             tame_index::SparseIndex::new(loc).unwrap(),
             tame_index::external::reqwest::blocking::ClientBuilder::new()
-                .http2_prior_knowledge()
                 .build()
                 .unwrap(),
         )
@@ -34,7 +33,6 @@ fn main() {
         tame_index::index::AsyncRemoteSparseIndex::new(
             tame_index::SparseIndex::new(loc).unwrap(),
             tame_index::external::reqwest::ClientBuilder::new()
-                .http2_prior_knowledge()
                 .build()
                 .unwrap(),
         )
