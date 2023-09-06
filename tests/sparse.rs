@@ -194,7 +194,6 @@ fn end_to_end() {
     let index = crates_io(&td);
 
     let client = reqwest::blocking::Client::builder()
-        .http2_prior_knowledge()
         .build()
         .unwrap();
 
