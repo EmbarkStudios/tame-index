@@ -193,9 +193,7 @@ fn end_to_end() {
     let td = utils::tempdir();
     let index = crates_io(&td);
 
-    let client = reqwest::blocking::Client::builder()
-        .build()
-        .unwrap();
+    let client = reqwest::blocking::Client::builder().build().unwrap();
 
     let rsi = tame_index::index::RemoteSparseIndex::new(index, client);
 
