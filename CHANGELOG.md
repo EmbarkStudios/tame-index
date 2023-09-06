@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#26](https://github.com/EmbarkStudios/tame-index/pull/26) changed sparse index request creation to not use HTTP/2 for the version to support corporate potato proxies. This results in a slight but noticeable degradation in throughput when making many requests to a sparse index.
+
 ## [0.5.4] - 2023-08-24
 ### Fixed
 - [PR#24](https://github.com/EmbarkStudios/tame-index/pull/24) resolved [#23](https://github.com/EmbarkStudios/tame-index/issues/23) by fixing a bug where index cache paths were not lower cased as cargo does.
