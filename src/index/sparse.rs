@@ -97,7 +97,7 @@ impl SparseIndex {
 
         let url = self.crate_url(name);
 
-        let mut req = http::Request::get(url).version(http::Version::HTTP_2);
+        let mut req = http::Request::get(url);
 
         {
             let headers = req.headers_mut().unwrap();
