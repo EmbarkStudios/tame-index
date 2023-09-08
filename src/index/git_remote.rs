@@ -63,7 +63,7 @@ impl RemoteGitIndex {
         lock_policy: gix::lock::acquire::Fail,
     ) -> Result<Self, Error>
     where
-        P: gix::Progress,
+        P: gix::NestedProgress,
         P::SubProgress: 'static,
     {
         let open_or_clone_repo = || -> Result<_, GitError> {
@@ -339,7 +339,7 @@ impl RemoteGitIndex {
         should_interrupt: &AtomicBool,
     ) -> Result<(), Error>
     where
-        P: gix::Progress,
+        P: gix::NestedProgress,
         P::SubProgress: 'static,
     {
         // We're updating the reflog which requires a committer be set, which might
@@ -416,7 +416,7 @@ pub enum GitError {
     #[error(transparent)]
     ReferenceLookup(#[from] Box<gix::reference::find::existing::Error>),
     #[error(transparent)]
-    BlobLookup(#[from] Box<gix::odb::find::existing::Error<gix::odb::store::find::Error>>),
+    BlobLookup(#[from] Box<gix::odb::find::existing::Error>),
     #[error(transparent)]
     RemoteLookup(#[from] Box<gix::remote::find::existing::Error>),
     #[error(transparent)]

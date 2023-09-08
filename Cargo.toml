@@ -59,13 +59,10 @@ twox-hash = { version = "1.6", default-features = false }
 
 [dependencies.gix]
 optional = true
-version = "0.52"
+version = "0.53.1"
 default-features = false
 features = [
-    "max-performance-safe",
-    "blocking-network-client",
     "blocking-http-transport-reqwest",
-    "reqwest-for-configuration-only",
 ]
 
 [dependencies.reqwest]
