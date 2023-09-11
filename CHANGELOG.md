@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
-## [0.5.6] - 2023-09-11
+### Changed
+- [PR#27](https://github.com/EmbarkStudios/tame-index/pull/27) updated `gix` to 0.53.1. Thanks [@Byron](https://github.com/Byron)!
+
+## [0.5.6] - 2023-09-11 **yanked**
 ### Changed
 - [PR#27](https://github.com/EmbarkStudios/tame-index/pull/27) updated `gix` to 0.53.1. Thanks [@Byron](https://github.com/Byron)!
 
