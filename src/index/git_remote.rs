@@ -63,7 +63,7 @@ impl RemoteGitIndex {
         lock_policy: gix::lock::acquire::Fail,
     ) -> Result<Self, Error>
     where
-        P: gix::Progress,
+        P: gix::NestedProgress,
         P::SubProgress: 'static,
     {
         let open_or_clone_repo = || -> Result<_, GitError> {
@@ -118,7 +118,8 @@ impl RemoteGitIndex {
                     .configure_remote(|remote| {
                         Ok(remote.with_refspecs(["+HEAD:refs/remotes/origin/HEAD"], DIR)?)
                     })
-                    .fetch_only(progress, should_interrupt)?;
+                    .fetch_only(progress, should_interrupt)
+                    .map_err(|err| GitError::from(Box::new(err)))?;
 
                 (repo, Some(out))
             };
@@ -339,7 +340,7 @@ impl RemoteGitIndex {
         should_interrupt: &AtomicBool,
     ) -> Result<(), Error>
     where
-        P: gix::Progress,
+        P: gix::NestedProgress,
         P::SubProgress: 'static,
     {
         // We're updating the reflog which requires a committer be set, which might
@@ -378,7 +379,7 @@ impl RemoteGitIndex {
             .prepare_fetch(&mut progress, Default::default())
             .map_err(|err| GitError::from(Box::new(err)))?
             .receive(&mut progress, should_interrupt)
-            .map_err(GitError::from)?;
+            .map_err(|err| GitError::from(Box::new(err)))?;
 
         crate::utils::git::write_fetch_head(&repo, &outcome, &remote)?;
         self.head_commit = Self::set_head(&mut self.index, &repo)?;
@@ -394,13 +395,13 @@ pub enum GitError {
     #[error(transparent)]
     ClonePrep(#[from] Box<gix::clone::Error>),
     #[error(transparent)]
-    CloneFetch(#[from] gix::clone::fetch::Error),
+    CloneFetch(#[from] Box<gix::clone::fetch::Error>),
     #[error(transparent)]
     Connect(#[from] Box<gix::remote::connect::Error>),
     #[error(transparent)]
     FetchPrep(#[from] Box<gix::remote::fetch::prepare::Error>),
     #[error(transparent)]
-    Fetch(#[from] gix::remote::fetch::Error),
+    Fetch(#[from] Box<gix::remote::fetch::Error>),
     #[error(transparent)]
     Open(#[from] Box<gix::open::Error>),
     #[error(transparent)]
@@ -416,7 +417,7 @@ pub enum GitError {
     #[error(transparent)]
     ReferenceLookup(#[from] Box<gix::reference::find::existing::Error>),
     #[error(transparent)]
-    BlobLookup(#[from] Box<gix::odb::find::existing::Error<gix::odb::store::find::Error>>),
+    BlobLookup(#[from] Box<gix::odb::find::existing::Error>),
     #[error(transparent)]
     RemoteLookup(#[from] Box<gix::remote::find::existing::Error>),
     #[error(transparent)]
@@ -440,54 +441,71 @@ impl GitError {
     pub fn is_spurious(&self) -> bool {
         use gix::protocol::transport::IsSpuriousError;
 
-        if let Self::Fetch(fe) | Self::CloneFetch(gix::clone::fetch::Error::Fetch(fe)) = self {
-            fe.is_spurious()
-        } else {
-            false
+        match self {
+            Self::Fetch(fe) => return fe.is_spurious(),
+            Self::CloneFetch(cf) => {
+                if let gix::clone::fetch::Error::Fetch(fe) = &**cf {
+                    return fe.is_spurious();
+                }
+            }
+            _ => {}
         }
+
+        false
     }
 
     /// Returns true if a fetch could not be completed successfully due to the
     /// repo being locked, and could succeed if retried
     #[inline]
     pub fn is_locked(&self) -> bool {
-        match self {
-            Self::Fetch(gix::remote::fetch::Error::UpdateRefs(ure))
-            | Self::CloneFetch(gix::clone::fetch::Error::Fetch(
-                gix::remote::fetch::Error::UpdateRefs(ure),
-            )) => {
-                if let gix::remote::fetch::refs::update::Error::EditReferences(ere) = ure {
-                    match ere {
-                        gix::reference::edit::Error::FileTransactionPrepare(ftpe) => {
-                            use gix::refs::file::transaction::prepare::Error as PrepError;
-                            if let PrepError::LockAcquire { source, .. }
-                            | PrepError::PackedTransactionAcquire(source) = ftpe
-                            {
-                                // currently this is either io or permanentlylocked, but just in case
-                                // more variants are added, we just assume it's possible to retry
-                                // in anything but the permanentlylocked variant
-                                !matches!(
-                                    source,
-                                    gix::lock::acquire::Error::PermanentlyLocked { .. }
-                                )
-                            } else {
-                                false
-                            }
-                        }
-                        gix::reference::edit::Error::FileTransactionCommit(ftce) => {
-                            matches!(
-                                ftce,
-                                gix::refs::file::transaction::commit::Error::LockCommit { .. }
-                            )
-                        }
-                        _ => false,
-                    }
+        let ure = match self {
+            Self::Fetch(fe) => {
+                if let gix::remote::fetch::Error::UpdateRefs(ure) = &**fe {
+                    ure
                 } else {
-                    false
+                    return false;
                 }
             }
-            Self::Lock(le) => !matches!(le, gix::lock::acquire::Error::PermanentlyLocked { .. }),
-            _ => false,
+            Self::CloneFetch(cf) => {
+                if let gix::clone::fetch::Error::Fetch(gix::remote::fetch::Error::UpdateRefs(ure)) =
+                    &**cf
+                {
+                    ure
+                } else {
+                    return false;
+                }
+            }
+            Self::Lock(le) => {
+                return !matches!(le, gix::lock::acquire::Error::PermanentlyLocked { .. })
+            }
+            _ => return false,
+        };
+
+        if let gix::remote::fetch::refs::update::Error::EditReferences(ere) = ure {
+            match ere {
+                gix::reference::edit::Error::FileTransactionPrepare(ftpe) => {
+                    use gix::refs::file::transaction::prepare::Error as PrepError;
+                    if let PrepError::LockAcquire { source, .. }
+                    | PrepError::PackedTransactionAcquire(source) = ftpe
+                    {
+                        // currently this is either io or permanentlylocked, but just in case
+                        // more variants are added, we just assume it's possible to retry
+                        // in anything but the permanentlylocked variant
+                        !matches!(source, gix::lock::acquire::Error::PermanentlyLocked { .. })
+                    } else {
+                        false
+                    }
+                }
+                gix::reference::edit::Error::FileTransactionCommit(ftce) => {
+                    matches!(
+                        ftce,
+                        gix::refs::file::transaction::commit::Error::LockCommit { .. }
+                    )
+                }
+                _ => false,
+            }
+        } else {
+            false
         }
     }
 }
