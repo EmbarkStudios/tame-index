@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#27](https://github.com/EmbarkStudios/tame-index/pull/27) updated `gix` to 0.53.1. Thanks [@Byron](https://github.com/Byron)!
+
 ## [0.5.5] - 2023-09-06
 ### Changed
 - [PR#26](https://github.com/EmbarkStudios/tame-index/pull/26) changed sparse index request creation to not use HTTP/2 for the version to support corporate potato proxies. This results in a slight but noticeable degradation in throughput when making many requests to a sparse index.
