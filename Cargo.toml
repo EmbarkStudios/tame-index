@@ -53,17 +53,15 @@ tokio = { version = "1.0", default-features = false, features = [
     "time",
 ], optional = true }
 # cargo config parsing
-toml = "0.7"
+toml = "0.8"
 # Faster hashing
 twox-hash = { version = "1.6", default-features = false }
 
 [dependencies.gix]
 optional = true
-version = "0.53.1"
+version = "0.54"
 default-features = false
-features = [
-    "blocking-http-transport-reqwest",
-]
+features = ["blocking-http-transport-reqwest"]
 
 [dependencies.reqwest]
 optional = true
@@ -72,7 +70,7 @@ default-features = false
 features = ["blocking", "gzip"]
 
 [dev-dependencies]
-cargo_metadata = "0.17"
+cargo_metadata = "0.18"
 rayon = "1.7"
 tempfile = "3.6"
 tiny-bench = "0.3"
