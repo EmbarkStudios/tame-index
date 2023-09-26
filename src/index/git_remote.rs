@@ -114,7 +114,8 @@ impl RemoteGitIndex {
             } else {
                 let (repo, out) = gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
                     .map_err(Box::new)?
-                    .with_remote_name("origin")?
+                    .with_remote_name("origin")
+                    .map_err(Box::new)?
                     .configure_remote(|remote| {
                         Ok(remote.with_refspecs(["+HEAD:refs/remotes/origin/HEAD"], DIR)?)
                     })
@@ -405,12 +406,6 @@ pub enum GitError {
     #[error(transparent)]
     Open(#[from] Box<gix::open::Error>),
     #[error(transparent)]
-    Peel(#[from] gix::reference::peel::Error),
-    #[error(transparent)]
-    Head(#[from] gix::reference::head_commit::Error),
-    #[error(transparent)]
-    HeadUpdate(#[from] gix::reference::edit::Error),
-    #[error(transparent)]
     Commit(#[from] gix::object::commit::Error),
     #[error(transparent)]
     InvalidObject(#[from] gix::object::try_into::Error),
@@ -423,7 +418,7 @@ pub enum GitError {
     #[error(transparent)]
     Lock(#[from] gix::lock::acquire::Error),
     #[error(transparent)]
-    RemoteName(#[from] gix::remote::name::Error),
+    RemoteName(#[from] Box<gix::remote::name::Error>),
     #[error(transparent)]
     Config(#[from] Box<gix::config::Error>),
     #[error(transparent)]

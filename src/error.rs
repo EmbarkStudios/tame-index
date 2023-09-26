@@ -32,7 +32,7 @@ pub enum Error {
     Json(#[from] serde_json::Error),
     /// Failed to deserialize TOML
     #[error(transparent)]
-    Toml(#[from] toml::de::Error),
+    Toml(#[from] Box<toml::de::Error>),
     /// An index entry did not contain any versions
     #[error("index entry contained no versions for the crate")]
     NoCrateVersions,
