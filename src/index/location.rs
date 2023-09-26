@@ -211,7 +211,7 @@ pub(crate) fn read_cargo_config<T>(
                     Err(err) => return Err(Error::IoPath(err, path)),
                 };
 
-                let toml: toml::Value = toml::from_str(&contents)?;
+                let toml: toml::Value = toml::from_str(&contents).map_err(Box::new)?;
                 if let Some(value) = callback(&toml) {
                     return Ok(Some(value));
                 }
@@ -233,7 +233,7 @@ pub(crate) fn read_cargo_config<T>(
         let path = home.join("config.toml");
         if path.exists() {
             let toml: toml::Value =
-                toml::from_str(&std::fs::read_to_string(&path)?).map_err(Error::Toml)?;
+                toml::from_str(&std::fs::read_to_string(&path)?).map_err(Box::new)?;
             if let Some(value) = callback(&toml) {
                 return Ok(Some(value));
             }
