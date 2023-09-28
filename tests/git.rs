@@ -15,6 +15,7 @@ fn remote_index(
             root: IndexPath::Exact(path.as_ref().to_owned()),
         })
         .unwrap(),
+        &utils::unlocked(),
     )
     .unwrap()
 }
@@ -251,11 +252,12 @@ impl FakeRemote {
 #[test]
 fn clones_new() {
     let remote = FakeRemote::new();
+    let lock = &utils::unlocked();
 
     let (rgi, _td) = remote.local();
 
     assert!(rgi
-        .cached_krate("clones_new".try_into().unwrap())
+        .cached_krate("clones_new".try_into().unwrap(), lock)
         .unwrap()
         .is_none());
 }
@@ -264,6 +266,7 @@ fn clones_new() {
 #[test]
 fn opens_existing() {
     let mut remote = FakeRemote::new();
+    let lock = &utils::unlocked();
 
     let krate = utils::fake_krate("opens-existing", 4);
     let expected_head = remote.commit(&krate);
@@ -278,7 +281,7 @@ fn opens_existing() {
     // This should not be in the cache
     assert_eq!(
         first
-            .krate("opens-existing".try_into().unwrap(), true)
+            .krate("opens-existing".try_into().unwrap(), true, lock)
             .expect("failed to read git blob")
             .expect("expected krate"),
         krate,
@@ -294,7 +297,7 @@ fn opens_existing() {
     // This should be in the cache as it is file based not memory based
     assert_eq!(
         first
-            .cached_krate("opens-existing".try_into().unwrap())
+            .cached_krate("opens-existing".try_into().unwrap(), lock)
             .expect("failed to read cache file")
             .expect("expected cached krate"),
         krate,
@@ -305,6 +308,7 @@ fn opens_existing() {
 #[test]
 fn updates_cache() {
     let mut remote = FakeRemote::new();
+    let lock = &utils::unlocked();
 
     let krate = utils::fake_krate("updates-cache", 4);
     let expected_head = remote.commit(&krate);
@@ -318,14 +322,14 @@ fn updates_cache() {
 
     // This should not be in the cache
     assert_eq!(
-        rgi.krate("updates-cache".try_into().unwrap(), true)
+        rgi.krate("updates-cache".try_into().unwrap(), true, lock)
             .expect("failed to read git blob")
             .expect("expected krate"),
         krate,
     );
 
     assert_eq!(
-        rgi.cached_krate("updates-cache".try_into().unwrap())
+        rgi.cached_krate("updates-cache".try_into().unwrap(), lock)
             .expect("failed to read cache file")
             .expect("expected krate"),
         krate,
@@ -337,6 +341,7 @@ fn updates_cache() {
 #[test]
 fn fetch_invalidates_cache() {
     let mut remote = FakeRemote::new();
+    let lock = &utils::unlocked();
 
     let krate = utils::fake_krate("invalidates-cache", 4);
     let same = utils::fake_krate("will-be-cached", 2);
@@ -352,13 +357,13 @@ fn fetch_invalidates_cache() {
 
     // These should not be in the cache
     assert_eq!(
-        rgi.krate("invalidates-cache".try_into().unwrap(), true)
+        rgi.krate("invalidates-cache".try_into().unwrap(), true, lock)
             .expect("failed to read git blob")
             .expect("expected krate"),
         krate,
     );
     assert_eq!(
-        rgi.krate("will-be-cached".try_into().unwrap(), true)
+        rgi.krate("will-be-cached".try_into().unwrap(), true, lock)
             .expect("failed to read git blob")
             .expect("expected krate"),
         same,
@@ -369,20 +374,20 @@ fn fetch_invalidates_cache() {
     let new_head = remote.commit(&new_krate);
 
     assert_eq!(
-        rgi.cached_krate("invalidates-cache".try_into().unwrap())
+        rgi.cached_krate("invalidates-cache".try_into().unwrap(), lock)
             .expect("failed to read cache file")
             .expect("expected krate"),
         krate,
     );
     assert_eq!(
-        rgi.cached_krate("will-be-cached".try_into().unwrap())
+        rgi.cached_krate("will-be-cached".try_into().unwrap(), lock)
             .expect("failed to read cache file")
             .expect("expected krate"),
         same,
     );
 
     // Perform fetch, which should invalidate the cache
-    rgi.fetch().unwrap();
+    rgi.fetch(lock).unwrap();
 
     assert_eq!(
         rgi.local().head_commit().unwrap(),
@@ -390,12 +395,12 @@ fn fetch_invalidates_cache() {
     );
 
     assert!(rgi
-        .cached_krate("invalidates-cache".try_into().unwrap())
+        .cached_krate("invalidates-cache".try_into().unwrap(), lock)
         .unwrap()
         .is_none());
 
     assert_eq!(
-        rgi.krate("invalidates-cache".try_into().unwrap(), true)
+        rgi.krate("invalidates-cache".try_into().unwrap(), true, lock)
             .expect("failed to read git blob")
             .expect("expected krate"),
         new_krate,
@@ -403,7 +408,7 @@ fn fetch_invalidates_cache() {
 
     // This crate _should_ still be cached as it was not changed in the fetch
     assert_eq!(
-        rgi.cached_krate("will-be-cached".try_into().unwrap())
+        rgi.cached_krate("will-be-cached".try_into().unwrap(), lock)
             .expect("failed to read cache file")
             .expect("expected krate"),
         same,
@@ -411,10 +416,10 @@ fn fetch_invalidates_cache() {
 
     // We haven't made new commits, so the fetch should not move HEAD and thus
     // cache entries should still be valid
-    rgi.fetch().unwrap();
+    rgi.fetch(lock).unwrap();
 
     assert_eq!(
-        rgi.cached_krate("invalidates-cache".try_into().unwrap())
+        rgi.cached_krate("invalidates-cache".try_into().unwrap(), lock)
             .unwrap()
             .unwrap(),
         new_krate
@@ -426,7 +431,7 @@ fn fetch_invalidates_cache() {
     let krate4 = utils::fake_krate("krate-4", 4);
     let expected_head = remote.commit(&krate4);
 
-    rgi.fetch().unwrap();
+    rgi.fetch(lock).unwrap();
 
     assert_eq!(
         rgi.local().head_commit().unwrap(),
@@ -434,13 +439,13 @@ fn fetch_invalidates_cache() {
     );
 
     assert_eq!(
-        rgi.cached_krate("invalidates-cache".try_into().unwrap())
+        rgi.cached_krate("invalidates-cache".try_into().unwrap(), lock)
             .expect("failed to read cache file")
             .expect("expected krate"),
         new_krate,
     );
     assert_eq!(
-        rgi.cached_krate("will-be-cached".try_into().unwrap())
+        rgi.cached_krate("will-be-cached".try_into().unwrap(), lock)
             .expect("failed to read cache file")
             .expect("expected krate"),
         same,
@@ -522,14 +527,15 @@ fn non_main_local_branch() {
     }
 
     let mut rgi = remote_index(&local_td, &remote.td);
+    let lock = &utils::unlocked();
 
     let first = utils::fake_krate("first", 1);
     remote.commit(&first);
 
-    rgi.fetch().unwrap();
+    rgi.fetch(lock).unwrap();
 
     assert_eq!(
-        rgi.krate("first".try_into().unwrap(), true)
+        rgi.krate("first".try_into().unwrap(), true, lock)
             .unwrap()
             .unwrap(),
         first

@@ -32,6 +32,7 @@ pub const INDEX_V_MAX: u32 = 2;
 /// The byte representation of [`INDEX_V_MAX`]
 const INDEX_V_MAX_BYTES: [u8; 4] = INDEX_V_MAX.to_le_bytes();
 
+use super::FileLock;
 use crate::{CacheError, Error, IndexKrate, KrateName, PathBuf};
 
 /// A wrapper around a byte buffer that has been (partially) validated to be a
@@ -227,8 +228,9 @@ impl IndexCache {
         &self,
         name: KrateName<'_>,
         revision: Option<&str>,
+        lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
-        let Some(contents) = self.read_cache_file(name)? else {
+        let Some(contents) = self.read_cache_file(name, lock)? else {
             return Ok(None);
         };
 
@@ -237,7 +239,12 @@ impl IndexCache {
     }
 
     /// Writes the specified crate and revision to the cache
-    pub fn write_to_cache(&self, krate: &IndexKrate, revision: &str) -> Result<PathBuf, Error> {
+    pub fn write_to_cache(
+        &self,
+        krate: &IndexKrate,
+        revision: &str,
+        _lock: &FileLock,
+    ) -> Result<PathBuf, Error> {
         let name = krate.name().try_into()?;
         let cache_path = self.cache_path(name);
 
@@ -280,7 +287,11 @@ impl IndexCache {
     ///
     /// It is recommended to use [`Self::cached_krate`]
     #[inline]
-    pub fn read_cache_file(&self, name: KrateName<'_>) -> Result<Option<Vec<u8>>, Error> {
+    pub fn read_cache_file(
+        &self,
+        name: KrateName<'_>,
+        _lock: &FileLock,
+    ) -> Result<Option<Vec<u8>>, Error> {
         let cache_path = self.cache_path(name);
 
         match std::fs::read(&cache_path) {

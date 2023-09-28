@@ -11,9 +11,10 @@ use tame_index::{index::cache::ValidCacheEntry, utils::get_index_details, IndexC
 fn parses_current_cargo_cache() {
     let (path, _url) = get_index_details(tame_index::CRATES_IO_HTTP_INDEX, None).unwrap();
     let cache = IndexCache::at_path(path);
+    let lock = &utils::unlocked();
 
     let cached = cache
-        .read_cache_file("camino".try_into().unwrap())
+        .read_cache_file("camino".try_into().unwrap(), lock)
         .expect("failed to read cache file")
         .expect("cache file not found");
 
@@ -49,9 +50,10 @@ fn parses_current_cargo_cache() {
 fn serializes_current_cargo_cache() {
     let (path, _url) = get_index_details(tame_index::CRATES_IO_HTTP_INDEX, None).unwrap();
     let cache = IndexCache::at_path(path);
+    let lock = &utils::unlocked();
 
     let cargos = cache
-        .read_cache_file("camino".try_into().unwrap())
+        .read_cache_file("camino".try_into().unwrap(), lock)
         .expect("failed to read cache file")
         .expect("cache file not found");
 

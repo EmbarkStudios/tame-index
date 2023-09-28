@@ -1,0 +1,24 @@
+output = "win_bindings.rs"
+binds = [
+    "CloseHandle",
+    "CreateEventA",
+    "ERROR_INVALID_FUNCTION",
+    "ERROR_IO_PENDING",
+    "ERROR_LOCK_VIOLATION",
+    "GetOverlappedResultEx",
+    "INFINITE",
+    "LockFileEx",
+    "LOCKFILE_EXCLUSIVE_LOCK",
+    "LOCKFILE_FAIL_IMMEDIATELY",
+    "UnlockFile",
+    "WAIT_IO_COMPLETION",
+    "WAIT_TIMEOUT",
+]
+
+[bind-mode]
+mode = "minwin"
+
+[bind-mode.config]
+enum-style = "minwin"
+fix-naming = true
+use-rust-casing = true

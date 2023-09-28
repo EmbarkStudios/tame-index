@@ -3,6 +3,7 @@
 
 use crate::{Error, InvalidUrl, InvalidUrlError, PathBuf};
 
+pub mod flock;
 #[cfg(feature = "git")]
 pub mod git;
 

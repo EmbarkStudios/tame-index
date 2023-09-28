@@ -1,4 +1,4 @@
-use super::IndexCache;
+use super::{FileLock, IndexCache};
 use crate::{Error, IndexKrate, KrateName, PathBuf};
 
 /// The URL of the crates.io index for use with git
@@ -66,8 +66,12 @@ impl GitIndex {
     /// There are no guarantees around freshness, and no network I/O will be
     /// performed.
     #[inline]
-    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
-        self.cache.cached_krate(name, self.head_commit())
+    pub fn cached_krate(
+        &self,
+        name: KrateName<'_>,
+        lock: &FileLock,
+    ) -> Result<Option<IndexKrate>, Error> {
+        self.cache.cached_krate(name, self.head_commit(), lock)
     }
 
     /// Writes the specified crate to the cache.
@@ -79,10 +83,11 @@ impl GitIndex {
         &self,
         krate: &IndexKrate,
         blob_id: Option<&str>,
+        lock: &FileLock,
     ) -> Result<Option<PathBuf>, Error> {
         let Some(id) = blob_id.or_else(|| self.head_commit()) else {
             return Ok(None);
         };
-        self.cache.write_to_cache(krate, id).map(Some)
+        self.cache.write_to_cache(krate, id, lock).map(Some)
     }
 }

@@ -1,4 +1,4 @@
-use super::SparseIndex;
+use super::{FileLock, SparseIndex};
 use crate::{Error, IndexKrate, KrateName};
 pub use reqwest::blocking::Client;
 pub use reqwest::Client as AsyncClient;
@@ -30,8 +30,9 @@ impl RemoteSparseIndex {
         &self,
         name: KrateName<'_>,
         write_cache_entry: bool,
+        lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
-        let req = self.index.make_remote_request(name, None)?;
+        let req = self.index.make_remote_request(name, None, lock)?;
         let req = req.try_into()?;
 
         let res = self.client.execute(req)?;
@@ -49,7 +50,7 @@ impl RemoteSparseIndex {
         let res = builder.body(body.to_vec())?;
 
         self.index
-            .parse_remote_response(name, res, write_cache_entry)
+            .parse_remote_response(name, res, write_cache_entry, lock)
     }
 
     /// Attempts to read the locally cached crate information
@@ -58,8 +59,12 @@ impl RemoteSparseIndex {
     /// guarantee that the cache information is up to date with the latest in
     /// the remote index
     #[inline]
-    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
-        self.index.cached_krate(name)
+    pub fn cached_krate(
+        &self,
+        name: KrateName<'_>,
+        lock: &FileLock,
+    ) -> Result<Option<IndexKrate>, Error> {
+        self.index.cached_krate(name, lock)
     }
 
     /// Helper method for downloading multiple crates in parallel
@@ -71,6 +76,7 @@ impl RemoteSparseIndex {
         &self,
         krates: BTreeSet<String>,
         write_cache_entries: bool,
+        lock: &FileLock,
     ) -> BTreeMap<String, Result<Option<IndexKrate>, Error>> {
         use rayon::prelude::*;
         krates
@@ -78,7 +84,7 @@ impl RemoteSparseIndex {
             .map(|kname| {
                 let res = || {
                     let name = kname.as_str().try_into()?;
-                    self.krate(name, write_cache_entries)
+                    self.krate(name, write_cache_entries, lock)
                 };
                 let res = res();
                 (kname, res)
@@ -108,12 +114,16 @@ impl AsyncRemoteSparseIndex {
         &self,
         name: KrateName<'_>,
         write_cache_entry: bool,
+        lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
-        let req = self.index.make_remote_request(name, None)?.try_into()?;
+        let req = self
+            .index
+            .make_remote_request(name, None, lock)?
+            .try_into()?;
         let res = Self::exec_request(&self.client, req).await?;
 
         self.index
-            .parse_remote_response(name, res, write_cache_entry)
+            .parse_remote_response(name, res, write_cache_entry, lock)
     }
 
     async fn exec_request(
@@ -151,8 +161,12 @@ impl AsyncRemoteSparseIndex {
     /// guarantee that the cache information is up to date with the latest in
     /// the remote index
     #[inline]
-    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
-        self.index.cached_krate(name)
+    pub fn cached_krate(
+        &self,
+        name: KrateName<'_>,
+        lock: &FileLock,
+    ) -> Result<Option<IndexKrate>, Error> {
+        self.index.cached_krate(name, lock)
     }
 
     /// Helper method for downloading multiples crates concurrently
@@ -173,16 +187,18 @@ impl AsyncRemoteSparseIndex {
         krates: BTreeSet<String>,
         write_cache_entries: bool,
         individual_timeout: Option<std::time::Duration>,
+        lock: &FileLock,
     ) -> BTreeMap<String, Result<Option<IndexKrate>, Error>> {
         let mut tasks = tokio::task::JoinSet::new();
 
         let mut results = BTreeMap::new();
         for kname in krates {
-            match kname
-                .as_str()
-                .try_into()
-                .and_then(|name| Ok(self.index.make_remote_request(name, None)?.try_into()?))
-            {
+            match kname.as_str().try_into().and_then(|name| {
+                Ok(self
+                    .index
+                    .make_remote_request(name, None, lock)?
+                    .try_into()?)
+            }) {
                 Ok(req) => {
                     let client = self.client.clone();
                     tasks.spawn(async move {
@@ -224,7 +240,7 @@ impl AsyncRemoteSparseIndex {
                             .try_into()
                             .expect("this was already validated");
                         self.index
-                            .parse_remote_response(name, res, write_cache_entries)
+                            .parse_remote_response(name, res, write_cache_entries, lock)
                     });
 
                     results.lock().unwrap().insert(kname, res);
@@ -244,11 +260,12 @@ impl AsyncRemoteSparseIndex {
         krates: BTreeSet<String>,
         write_cache_entries: bool,
         individual_timeout: Option<std::time::Duration>,
+        lock: &FileLock,
     ) -> Result<BTreeMap<String, Result<Option<IndexKrate>, Error>>, tokio::runtime::TryCurrentError>
     {
         let current = tokio::runtime::Handle::try_current()?;
         Ok(current.block_on(async {
-            self.krates(krates, write_cache_entries, individual_timeout)
+            self.krates(krates, write_cache_entries, individual_timeout, lock)
                 .await
         }))
     }

@@ -1,5 +1,6 @@
 //! Contains code for reading and writing [local registries](https://doc.rust-lang.org/cargo/reference/source-replacement.html#local-registry-sources)
 
+use super::FileLock;
 use crate::{Error, IndexKrate, KrateName, Path, PathBuf};
 use smol_str::SmolStr;
 
@@ -130,7 +131,11 @@ impl LocalRegistry {
     /// Note this naming is just to be consistent with [`crate::SparseIndex`] and
     /// [`crate::GitIndex`], local registries do not have a .cache in the index
     #[inline]
-    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
+    pub fn cached_krate(
+        &self,
+        name: KrateName<'_>,
+        _lock: &FileLock,
+    ) -> Result<Option<IndexKrate>, Error> {
         let index_path = make_path(&self.path, name);
 
         let buf = match std::fs::read(&index_path) {
