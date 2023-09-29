@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#34](https://github.com/EmbarkStudios/tame-index/pull/33) resolved a compile issue when targeting `musl` libc.
+
 ## [0.7.0] - 2023-09-29
 ### Changed
 - [PR#32](https://github.com/EmbarkStudios/tame-index/pull/32) resolved [#31](https://github.com/EmbarkStudios/tame-index/issues/31) by reducing the size of `Error`.
