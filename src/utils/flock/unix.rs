@@ -83,7 +83,7 @@ pub(super) fn lock(file: &File, state: LockState, timeout: Option<Duration>) -> 
         // nice, so we use a simpler approach of just spawning a thread and sending
         // a signal to it ourselves. Less efficient probably, but IMO cleaner
         let file_ptr = file as *const _ as usize;
-        let mut thread_id: libc::pthread_t = 0;
+        let mut thread_id: libc::pthread_t = unsafe { std::mem::zeroed() };
         let tid = &mut thread_id as *mut _ as usize;
         let (tx, rx) = std::sync::mpsc::channel();
         let lock_thread = std::thread::Builder::new()
