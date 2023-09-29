@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 //! Provides facilities for file locks on unix and windows
 
 use crate::{Error, Path, PathBuf};
@@ -18,6 +17,7 @@ pub struct FileLockError {
     pub source: LockError,
 }
 
+/// Errors that can occur when attempting to acquire a [`FileLock`]
 #[derive(Debug, thiserror::Error)]
 pub enum LockError {
     /// An I/O error occurred attempting to open the lock file
@@ -44,11 +44,12 @@ pub enum LockError {
     /// The lock could not be acquired within the caller provided timeout
     #[error("failed to acquire lock within the specified duration")]
     TimedOut,
-    /// The lock could not be acquired within the caller provided timeout
-    #[error("failed to acquire lock within the specified duration")]
+    /// The lock is currently held by another
+    #[error("the lock is currently held by another")]
     Contested,
 }
 
+/// Provides options for creating a [`FileLock`]
 pub struct LockOptions<'pb> {
     path: std::borrow::Cow<'pb, Path>,
     exclusive: bool,
@@ -56,6 +57,7 @@ pub struct LockOptions<'pb> {
 }
 
 impl<'pb> LockOptions<'pb> {
+    /// Creates a new [`Self`] for the specified path
     #[inline]
     pub fn new(path: &'pb Path) -> Self {
         Self {
@@ -65,6 +67,10 @@ impl<'pb> LockOptions<'pb> {
         }
     }
 
+    /// Creates a new [`Self`] for locking cargo's global package lock
+    ///
+    /// If specified, the path is used as the root, otherwise it is rooted at
+    /// the path determined by `$CARGO_HOME`
     #[inline]
     pub fn cargo_package_lock(root: Option<PathBuf>) -> Result<Self, Error> {
         let mut path = if let Some(root) = root {
@@ -81,12 +87,15 @@ impl<'pb> LockOptions<'pb> {
         })
     }
 
+    /// Will attempt to acquire a shared lock rather than an exclusive one
     #[inline]
     pub fn shared(mut self) -> Self {
         self.exclusive = false;
         self
     }
 
+    /// Will attempt to acquire an exclusive lock, which can optionally fallback
+    /// to a shared lock if the lock file is for a read only filesystem
     #[inline]
     pub fn exclusive(mut self, shared_fallback: bool) -> Self {
         self.exclusive = true;
@@ -94,11 +103,19 @@ impl<'pb> LockOptions<'pb> {
         self
     }
 
+    /// Attempts to acquire a lock, but fails immediately if the lock is currently
+    /// held
     #[inline]
     pub fn try_lock(&self) -> Result<FileLock, Error> {
         self.open_and_lock(Option::<fn(&Path) -> Option<Duration>>::None)
     }
 
+    /// Attempts to acquire a lock, waiting if the lock is currently held.
+    ///
+    /// Unlike [`Self::try_lock`], if the lock is currently held, the specified
+    /// callback is called to inform the caller that a wait is about to
+    /// be performed, then waits for the amount of time specified by the return
+    /// of the callback, or infinitely in the case of `None`.
     #[inline]
     pub fn lock(&self, wait: impl Fn(&Path) -> Option<Duration>) -> Result<FileLock, Error> {
         self.open_and_lock(Some(wait))
@@ -251,12 +268,20 @@ enum LockState {
     Unlocked,
 }
 
+/// A currently held file lock.
+///
+/// The lock is released when this is dropped, or the program exits for any reason,
+/// including `SIGKILL` or power loss
 pub struct FileLock {
     file: Option<std::fs::File>,
     state: LockState,
 }
 
 impl FileLock {
+    /// Creates a [`Self`] in an unlocked state.
+    ///
+    /// This allows for easy testing or use in situations where you don't care
+    /// about file locking, or have other ways to ensure something is uncontested
     pub fn unlocked() -> Self {
         Self {
             file: None,

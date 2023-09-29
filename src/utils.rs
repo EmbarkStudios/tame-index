@@ -7,7 +7,7 @@ pub mod flock;
 #[cfg(feature = "git")]
 pub mod git;
 
-/// Returns the storage directory (in utf-8) used by Cargo, often knowns as
+/// Returns the storage directory (in utf-8) used by Cargo, often known as
 /// `.cargo` or `CARGO_HOME`
 #[inline]
 pub fn cargo_home() -> Result<crate::PathBuf, crate::Error> {
