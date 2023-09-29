@@ -14,11 +14,6 @@
     Handle
 );
 ::windows_targets::link!(
-    "kernel32.dll" "system" "GetOverlappedResultEx" fn get_overlapped_result_ex(file :
-    Handle, overlapped : * const Overlapped, number_of_bytes_transferred : * mut u32,
-    milliseconds : u32, alertable : Bool) -> Bool
-);
-::windows_targets::link!(
     "kernel32.dll" "system" "LockFileEx" fn lock_file_ex(file : Handle, flags :
     LockFileFlags::Enum, reserved : u32, number_of_bytes_to_lock_low : u32,
     number_of_bytes_to_lock_high : u32, overlapped : * mut Overlapped) -> Bool
@@ -27,6 +22,10 @@
     "kernel32.dll" "system" "UnlockFile" fn unlock_file(file : Handle, file_offset_low :
     u32, file_offset_high : u32, number_of_bytes_to_unlock_low : u32,
     number_of_bytes_to_unlock_high : u32) -> Bool
+);
+::windows_targets::link!(
+    "kernel32.dll" "system" "WaitForSingleObject" fn wait_for_single_object(handle :
+    Handle, milliseconds : u32) -> Win32Error::Enum
 );
 pub const Infinite: u32 = 4294967295;
 pub type Bool = i32;
@@ -66,6 +65,7 @@ pub struct SecurityAttributes {
 }
 pub mod Win32Error {
     pub type Enum = u32;
+    pub const WaitObject0: Enum = 0;
     pub const ErrorInvalidFunction: Enum = 1;
     pub const ErrorLockViolation: Enum = 33;
     pub const WaitIoCompletion: Enum = 192;

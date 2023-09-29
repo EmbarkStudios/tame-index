@@ -79,7 +79,6 @@ fn flock(file: &File, flags: u32, timeout: Option<Duration>) -> Result {
                 .raw_os_error()
                 .map_or(false, |x| x == Win32Error::ErrorIoPending as i32)
             {
-                let mut locked = 0;
                 let timeout = timeout.map_or(0, |dur| {
                     let millis = dur.as_millis();
                     if millis >= Infinite as u128 {
@@ -89,17 +88,12 @@ fn flock(file: &File, flags: u32, timeout: Option<Duration>) -> Result {
                     }
                 });
 
-                if get_overlapped_result_ex(
-                    file.as_raw_handle() as Handle,
-                    &overlapped,
-                    &mut locked,
-                    timeout,
-                    1,
-                ) == 0
-                {
-                    Err(Error::last_os_error())
-                } else {
-                    Ok(())
+                match wait_for_single_object(overlapped.event, timeout) {
+                    Win32Error::WaitObject0 => Ok(()),
+                    Win32Error::WaitTimeout => {
+                        Err(Error::from_raw_os_error(Win32Error::WaitTimeout as _))
+                    }
+                    _ => Err(Error::last_os_error()),
                 }
             } else {
                 Err(err)

@@ -6,13 +6,14 @@ binds = [
     "ERROR_IO_PENDING",
     "ERROR_LOCK_VIOLATION",
     "FILE_FLAG_OVERLAPPED",
-    "GetOverlappedResultEx",
     "INFINITE",
     "LockFileEx",
     "LOCKFILE_EXCLUSIVE_LOCK",
     "LOCKFILE_FAIL_IMMEDIATELY",
     "UnlockFile",
+    "WaitForSingleObject",
     "WAIT_IO_COMPLETION",
+    "WAIT_OBJECT_0",
     "WAIT_TIMEOUT",
 ]
 
