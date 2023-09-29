@@ -27,13 +27,15 @@ fn builds_local_registry() {
         versions: Vec<smol_str::SmolStr>,
     }
 
+    let lock = tame_index::utils::flock::FileLock::unlocked();
+
     for pkg in &md.packages {
         if pkg.name == "tame-index" {
             continue;
         }
         let ip = krates.entry(pkg.name.clone()).or_insert_with(|| {
             let ik = sparse
-                .cached_krate(pkg.name.as_str().try_into().unwrap())
+                .cached_krate(pkg.name.as_str().try_into().unwrap(), &lock)
                 .unwrap()
                 .unwrap();
 
