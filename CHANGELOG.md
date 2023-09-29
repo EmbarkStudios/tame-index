@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - [PR#32](https://github.com/EmbarkStudios/tame-index/pull/32) resolved [#31](https://github.com/EmbarkStudios/tame-index/issues/31) by reducing the size of `Error`.
 - [PR#33](https://github.com/EmbarkStudios/tame-index/pull/33) updated dependencies, notably `gix` -> 0.54.
+- [PR#33](https://github.com/EmbarkStudios/tame-index/pull/33) added a `tame_index::utils::flock::FileLock` parameter to all methods on indices that perform disk operations.
+
+### Added
+- [PR#33](https://github.com/EmbarkStudios/tame-index/pull/33) added `tame_index::utils::flock`, which contains a `FileLock` for holding an OS file lock for a particular path, as well as `LockOptions` for creating them.
+
+### Fixed
+- [PR#33](https://github.com/EmbarkStudios/tame-index/pull/33) resolved [#30](https://github.com/EmbarkStudios/tame-index/issues/30) by removing the usage of `gix::lock` in favor of the aforementioned `FileLock`
+- [PR#33](https://github.com/EmbarkStudios/tame-index/pull/33) resolved [#17](https://github.com/EmbarkStudios/tame-index/issues/17) by adding `LockOptions::cargo_package_lock` to easily create a lock file compatible with cargo's own ($CARGO_HOME global) package lock.
 
 ## [0.6.0] - 2023-09-11
 ### Changed
