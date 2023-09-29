@@ -1,7 +1,7 @@
 #[cfg(feature = "local")]
 use crate::index::LocalRegistry;
 use crate::{
-    index::{RemoteGitIndex, RemoteSparseIndex},
+    index::{FileLock, RemoteGitIndex, RemoteSparseIndex},
     Error, IndexKrate, KrateName,
 };
 
@@ -29,23 +29,28 @@ impl ComboIndex {
         &self,
         name: KrateName<'_>,
         write_cache_entry: bool,
+        lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
         match self {
-            Self::Git(index) => index.krate(name, write_cache_entry),
-            Self::Sparse(index) => index.krate(name, write_cache_entry),
+            Self::Git(index) => index.krate(name, write_cache_entry, lock),
+            Self::Sparse(index) => index.krate(name, write_cache_entry, lock),
             #[cfg(feature = "local")]
-            Self::Local(lr) => lr.cached_krate(name),
+            Self::Local(lr) => lr.cached_krate(name, lock),
         }
     }
 
     /// Retrieves the cached crate metadata if it exists
     #[inline]
-    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
+    pub fn cached_krate(
+        &self,
+        name: KrateName<'_>,
+        lock: &FileLock,
+    ) -> Result<Option<IndexKrate>, Error> {
         match self {
-            Self::Git(index) => index.cached_krate(name),
-            Self::Sparse(index) => index.cached_krate(name),
+            Self::Git(index) => index.cached_krate(name, lock),
+            Self::Sparse(index) => index.cached_krate(name, lock),
             #[cfg(feature = "local")]
-            Self::Local(lr) => lr.cached_krate(name),
+            Self::Local(lr) => lr.cached_krate(name, lock),
         }
     }
 }

@@ -50,6 +50,9 @@ pub enum Error {
     #[cfg(feature = "local")]
     #[error(transparent)]
     Local(#[from] LocalRegistryError),
+    /// Failed to lock a file
+    #[error(transparent)]
+    Lock(#[from] crate::utils::flock::FileLockError),
 }
 
 impl From<std::path::PathBuf> for Error {

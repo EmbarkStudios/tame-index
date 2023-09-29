@@ -29,6 +29,8 @@ pub use sparse::SparseIndex;
 #[cfg(feature = "sparse")]
 pub use sparse_remote::{AsyncRemoteSparseIndex, RemoteSparseIndex};
 
+pub use crate::utils::flock::FileLock;
+
 /// Global configuration of an index, reflecting the [contents of config.json](https://doc.rust-lang.org/cargo/reference/registries.html#index-format).
 #[derive(Eq, PartialEq, PartialOrd, Ord, Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct IndexConfig {
@@ -119,12 +121,13 @@ impl ComboIndexCache {
     pub fn cached_krate(
         &self,
         name: crate::KrateName<'_>,
+        lock: &FileLock,
     ) -> Result<Option<crate::IndexKrate>, Error> {
         match self {
-            Self::Git(index) => index.cached_krate(name),
-            Self::Sparse(index) => index.cached_krate(name),
+            Self::Git(index) => index.cached_krate(name, lock),
+            Self::Sparse(index) => index.cached_krate(name, lock),
             #[cfg(feature = "local")]
-            Self::Local(lr) => lr.cached_krate(name),
+            Self::Local(lr) => lr.cached_krate(name, lock),
         }
     }
 

@@ -27,9 +27,10 @@ fn opens_crates_io() {
 #[test]
 fn make_request_without_cache() {
     let index = crates_io(env!("CARGO_MANIFEST_DIR"));
+    let lock = &utils::unlocked();
 
     let req = index
-        .make_remote_request("serde".try_into().unwrap(), None)
+        .make_remote_request("serde".try_into().unwrap(), None, lock)
         .unwrap();
 
     let hdrs = req.headers();
@@ -50,18 +51,18 @@ const DATE: &str = "Thu, 22 Oct 2023 09:40:03 GMT";
 #[test]
 fn make_request_with_cache() {
     let td = utils::tempdir();
-
     let index = crates_io(&td);
+    let lock = &utils::unlocked();
 
     {
         let etag_krate = utils::fake_krate("etag-krate", 2);
         index
             .cache()
-            .write_to_cache(&etag_krate, &format!("{}: {ETAG}", header::ETAG))
+            .write_to_cache(&etag_krate, &format!("{}: {ETAG}", header::ETAG), lock)
             .unwrap();
 
         let req = index
-            .make_remote_request("etag-krate".try_into().unwrap(), None)
+            .make_remote_request("etag-krate".try_into().unwrap(), None, lock)
             .unwrap();
 
         assert_eq!(req.headers().get(header::IF_NONE_MATCH).unwrap(), ETAG);
@@ -69,7 +70,7 @@ fn make_request_with_cache() {
 
     {
         let req = index
-            .make_remote_request("etag-specified-krate".try_into().unwrap(), Some(ETAG))
+            .make_remote_request("etag-specified-krate".try_into().unwrap(), Some(ETAG), lock)
             .unwrap();
 
         assert_eq!(req.headers().get(header::IF_NONE_MATCH).unwrap(), ETAG);
@@ -82,11 +83,12 @@ fn make_request_with_cache() {
             .write_to_cache(
                 &modified_krate,
                 &format!("{}: {DATE}", header::LAST_MODIFIED),
+                lock,
             )
             .unwrap();
 
         let req = index
-            .make_remote_request("modified-krate".try_into().unwrap(), None)
+            .make_remote_request("modified-krate".try_into().unwrap(), None, lock)
             .unwrap();
 
         assert_eq!(req.headers().get(header::IF_MODIFIED_SINCE).unwrap(), DATE);
@@ -98,11 +100,12 @@ fn make_request_with_cache() {
 fn parse_unmodified_response() {
     let td = utils::tempdir();
     let index = crates_io(&td);
+    let lock = &utils::unlocked();
 
     let etag_krate = utils::fake_krate("etag-krate", 2);
     index
         .cache()
-        .write_to_cache(&etag_krate, &format!("{}: {ETAG}", header::ETAG))
+        .write_to_cache(&etag_krate, &format!("{}: {ETAG}", header::ETAG), lock)
         .unwrap();
 
     let response = http::Response::builder()
@@ -112,7 +115,7 @@ fn parse_unmodified_response() {
         .unwrap();
 
     let cached_krate = index
-        .parse_remote_response("etag-krate".try_into().unwrap(), response, true)
+        .parse_remote_response("etag-krate".try_into().unwrap(), response, true, lock)
         .unwrap()
         .expect("cached krate");
 
@@ -124,6 +127,7 @@ fn parse_unmodified_response() {
 fn parse_modified_response() {
     let td = utils::tempdir();
     let index = crates_io(&td);
+    let lock = &utils::unlocked();
 
     {
         let etag_krate = utils::fake_krate("etag-krate", 3);
@@ -137,7 +141,7 @@ fn parse_modified_response() {
             .unwrap();
 
         let new_krate = index
-            .parse_remote_response("etag-krate".try_into().unwrap(), response, true)
+            .parse_remote_response("etag-krate".try_into().unwrap(), response, true, lock)
             .unwrap()
             .expect("new response");
 
@@ -148,6 +152,7 @@ fn parse_modified_response() {
             .cached_krate(
                 "etag-krate".try_into().unwrap(),
                 Some(&format!("{}: {ETAG}", header::ETAG)),
+                lock,
             )
             .unwrap()
             .expect("cached krate");
@@ -167,7 +172,7 @@ fn parse_modified_response() {
             .unwrap();
 
         let new_krate = index
-            .parse_remote_response("modified-krate".try_into().unwrap(), response, true)
+            .parse_remote_response("modified-krate".try_into().unwrap(), response, true, lock)
             .unwrap()
             .expect("new response");
 
@@ -178,6 +183,7 @@ fn parse_modified_response() {
             .cached_krate(
                 "modified-krate".try_into().unwrap(),
                 Some(&format!("{}: {DATE}", header::LAST_MODIFIED)),
+                lock,
             )
             .unwrap()
             .expect("cached krate");
@@ -192,13 +198,14 @@ fn parse_modified_response() {
 fn end_to_end() {
     let td = utils::tempdir();
     let index = crates_io(&td);
+    let lock = &utils::unlocked();
 
     let client = reqwest::blocking::Client::builder().build().unwrap();
 
     let rsi = tame_index::index::RemoteSparseIndex::new(index, client);
 
     let spdx_krate = rsi
-        .krate("spdx".try_into().unwrap(), true)
+        .krate("spdx".try_into().unwrap(), true, lock)
         .expect("failed to retrieve spdx")
         .expect("failed to find spdx");
 

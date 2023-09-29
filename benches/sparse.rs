@@ -60,7 +60,11 @@ fn main() {
 }
 
 fn blocking(rsi: &tame_index::index::RemoteSparseIndex, krates: &KrateSet) {
-    let krates = rsi.krates(krates.clone(), true);
+    let krates = rsi.krates(
+        krates.clone(),
+        true,
+        &tame_index::index::FileLock::unlocked(),
+    );
 
     for (krate, res) in krates {
         if let Err(err) = res {
@@ -70,7 +74,14 @@ fn blocking(rsi: &tame_index::index::RemoteSparseIndex, krates: &KrateSet) {
 }
 
 fn asunc(rsi: &tame_index::index::AsyncRemoteSparseIndex, krates: &KrateSet) {
-    let krates = rsi.krates_blocking(krates.clone(), true, None).unwrap();
+    let krates = rsi
+        .krates_blocking(
+            krates.clone(),
+            true,
+            None,
+            &tame_index::index::FileLock::unlocked(),
+        )
+        .unwrap();
 
     for (krate, res) in krates {
         if let Err(err) = res {

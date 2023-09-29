@@ -1,4 +1,4 @@
-use super::GitIndex;
+use super::{FileLock, GitIndex};
 use crate::{Error, IndexKrate, KrateName};
 use std::sync::atomic::AtomicBool;
 
@@ -30,14 +30,12 @@ impl RemoteGitIndex {
     /// if the process is interrupted with Ctrl+C. To support `panic = abort` you also need to register
     /// the `gix` signal handler to clean up the locks, see [`gix::interrupt::init_handler`].
     #[inline]
-    pub fn new(index: GitIndex) -> Result<Self, Error> {
+    pub fn new(index: GitIndex, lock: &FileLock) -> Result<Self, Error> {
         Self::with_options(
             index,
             gix::progress::Discard,
             &gix::interrupt::IS_INTERRUPTED,
-            gix::lock::acquire::Fail::AfterDurationWithBackoff(std::time::Duration::from_secs(
-                60 * 10, /* 10 minutes */
-            )),
+            lock,
         )
     }
 
@@ -60,7 +58,7 @@ impl RemoteGitIndex {
         mut index: GitIndex,
         progress: P,
         should_interrupt: &AtomicBool,
-        lock_policy: gix::lock::acquire::Fail,
+        _lock: &FileLock,
     ) -> Result<Self, Error>
     where
         P: gix::NestedProgress,
@@ -81,14 +79,6 @@ impl RemoteGitIndex {
 
             mapping.reduced = open_with_complete_config.clone();
             mapping.full = open_with_complete_config.clone();
-
-            let _lock = gix::lock::Marker::acquire_to_hold_resource(
-                index.cache.path.with_extension("tame-index"),
-                lock_policy,
-                Some(std::path::PathBuf::from_iter(Some(
-                    std::path::Component::RootDir,
-                ))),
-            )?;
 
             // Attempt to open the repository, if it fails for any reason,
             // attempt to perform a fresh clone instead
@@ -235,8 +225,9 @@ impl RemoteGitIndex {
         &self,
         name: KrateName<'_>,
         write_cache_entry: bool,
+        lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
-        if let Ok(Some(cached)) = self.cached_krate(name) {
+        if let Ok(Some(cached)) = self.cached_krate(name, lock) {
             return Ok(Some(cached));
         }
 
@@ -252,7 +243,7 @@ impl RemoteGitIndex {
             let gix::ObjectId::Sha1(sha1) = blob.id;
             let blob_id = crate::utils::encode_hex(&sha1, &mut hex_id);
 
-            let _ = self.index.write_to_cache(&krate, Some(blob_id));
+            let _ = self.index.write_to_cache(&krate, Some(blob_id), lock);
         }
 
         Ok(Some(krate))
@@ -302,8 +293,12 @@ impl RemoteGitIndex {
     /// advantage of that though as it does not have access to git and thus
     /// cannot know the blob id.
     #[inline]
-    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
-        let Some(cached) = self.index.cache.read_cache_file(name)? else {
+    pub fn cached_krate(
+        &self,
+        name: KrateName<'_>,
+        lock: &FileLock,
+    ) -> Result<Option<IndexKrate>, Error> {
+        let Some(cached) = self.index.cache.read_cache_file(name, lock)? else {
             return Ok(None);
         };
         let valid = crate::index::cache::ValidCacheEntry::read(&cached)?;
@@ -329,8 +324,12 @@ impl RemoteGitIndex {
     ///
     /// This method performs network I/O.
     #[inline]
-    pub fn fetch(&mut self) -> Result<(), Error> {
-        self.fetch_with_options(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)
+    pub fn fetch(&mut self, lock: &FileLock) -> Result<(), Error> {
+        self.fetch_with_options(
+            gix::progress::Discard,
+            &gix::interrupt::IS_INTERRUPTED,
+            lock,
+        )
     }
 
     /// Same as [`Self::fetch`] but allows specifying a progress implementation
@@ -339,6 +338,7 @@ impl RemoteGitIndex {
         &mut self,
         mut progress: P,
         should_interrupt: &AtomicBool,
+        _lock: &FileLock,
     ) -> Result<(), Error>
     where
         P: gix::NestedProgress,

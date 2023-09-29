@@ -47,6 +47,11 @@ pub fn tempdir() -> TempDir {
     TempDir::default()
 }
 
+#[inline]
+pub fn unlocked() -> tame_index::index::FileLock {
+    tame_index::index::FileLock::unlocked()
+}
+
 pub fn fake_krate(name: &str, num_versions: u8) -> IndexKrate {
     assert!(num_versions > 0);
     let mut version = semver::Version::new(0, 0, 0);

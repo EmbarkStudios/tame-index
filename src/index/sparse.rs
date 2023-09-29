@@ -1,4 +1,4 @@
-use super::{cache::ValidCacheEntry, IndexCache};
+use super::{cache::ValidCacheEntry, FileLock, IndexCache};
 use crate::{Error, HttpError, IndexKrate, KrateName};
 
 /// The default URL of the crates.io HTTP index
@@ -72,8 +72,12 @@ impl SparseIndex {
 
     /// Attempts to read the locally cached crate information
     #[inline]
-    pub fn cached_krate(&self, name: KrateName<'_>) -> Result<Option<IndexKrate>, Error> {
-        self.cache.cached_krate(name, None)
+    pub fn cached_krate(
+        &self,
+        name: KrateName<'_>,
+        lock: &FileLock,
+    ) -> Result<Option<IndexKrate>, Error> {
+        self.cache.cached_krate(name, None, lock)
     }
 
     /// Creates an HTTP request that can be sent via your HTTP client of choice
@@ -92,6 +96,7 @@ impl SparseIndex {
         &self,
         name: KrateName<'_>,
         etag: Option<&str>,
+        lock: &FileLock,
     ) -> Result<http::Request<&'static [u8]>, Error> {
         use http::header;
 
@@ -129,7 +134,7 @@ impl SparseIndex {
             // If we're unable to get the cache version we can just ignore setting the
             // header, guaranteeing we'll get the full index contents if the crate exists
             let set_cache_version = |headers: &mut header::HeaderMap| -> Option<()> {
-                let contents = self.cache.read_cache_file(name).ok()??;
+                let contents = self.cache.read_cache_file(name, lock).ok()??;
                 let valid = ValidCacheEntry::read(&contents).ok()?;
 
                 let (key, value) = valid.revision.split_once(':')?;
@@ -182,6 +187,7 @@ impl SparseIndex {
         name: KrateName<'_>,
         response: http::Response<Vec<u8>>,
         write_cache_entry: bool,
+        lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
         use http::{header, StatusCode};
         let (parts, body) = response.into_parts();
@@ -210,14 +216,14 @@ impl SparseIndex {
                     // It's unfortunate if we can't write to the cache, but we
                     // don't treat it as a hard error since we still have the
                     // index metadata
-                    let _err = self.cache.write_to_cache(&krate, &revision);
+                    let _err = self.cache.write_to_cache(&krate, &revision, lock);
                 }
 
                 Ok(Some(krate))
             }
             // The local cache entry is up to date with the latest entry on the
             // server, we can just return the local one
-            StatusCode::NOT_MODIFIED => self.cache.cached_krate(name, None),
+            StatusCode::NOT_MODIFIED => self.cache.cached_krate(name, None, lock),
             // The server requires authorization but the user didn't provide it
             StatusCode::UNAUTHORIZED => Err(HttpError::StatusCode {
                 code: StatusCode::UNAUTHORIZED,
