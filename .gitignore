@@ -1,5 +1,4 @@
 /target
 **/*.rs.bk
 Cargo.lock
-tests/flock/Cargo.toml
 tests/flock/target
