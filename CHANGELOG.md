@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - ReleaseDate
 ### Changed
 - [PR#32](https://github.com/EmbarkStudios/tame-index/pull/32) resolved [#31](https://github.com/EmbarkStudios/tame-index/issues/31) by reducing the size of `Error`.
+- [PR#33](https://github.com/EmbarkStudios/tame-index/pull/33) updated dependencies, notably `gix` -> 0.54.
 
 ## [0.6.0] - 2023-09-11
 ### Changed
