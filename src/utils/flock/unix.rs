@@ -24,6 +24,18 @@ macro_rules! error {
 }
 
 #[inline]
+pub(super) fn open_opts(exclusive: bool) -> std::fs::OpenOptions {
+    let mut o = std::fs::OpenOptions::new();
+    o.read(true);
+
+    if exclusive {
+        o.write(true).create(true);
+    }
+
+    o
+}
+
+#[inline]
 pub(super) fn try_lock(file: &File, state: LockState) -> Result {
     flock(file, flock_flag!(state) | libc::LOCK_NB)
 }

@@ -137,7 +137,7 @@ impl<'pb> LockOptions<'pb> {
         wait: Option<impl Fn(&Path) -> Option<Duration>>,
     ) -> Result<FileLock, Error> {
         let (state, file) = if self.exclusive {
-            match self.open(fs::OpenOptions::new().read(true).write(true).create(true)) {
+            match self.open(&sys::open_opts(true)) {
                 Ok(file) => (LockState::Exclusive, file),
                 Err(err) => {
                     // If the user requested it, check if the error is due to a read only error,
@@ -146,20 +146,14 @@ impl<'pb> LockOptions<'pb> {
                     //
                     // https://github.com/rust-lang/cargo/blob/0b6cc3c75f1813df857fb54421edf7f8fee548e3/src/cargo/util/config/mod.rs#L1907-L1935
                     if self.shared_fallback && matches!(err.source, LockError::Readonly) {
-                        (
-                            LockState::Shared,
-                            self.open(fs::OpenOptions::new().read(true))?,
-                        )
+                        (LockState::Shared, self.open(&sys::open_opts(false))?)
                     } else {
                         return Err(err.into());
                     }
                 }
             }
         } else {
-            (
-                LockState::Shared,
-                self.open(fs::OpenOptions::new().read(true))?,
-            )
+            (LockState::Shared, self.open(&sys::open_opts(false))?)
         };
 
         self.do_lock(state, &file, wait)

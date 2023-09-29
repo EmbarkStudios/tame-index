@@ -5,6 +5,7 @@ binds = [
     "ERROR_INVALID_FUNCTION",
     "ERROR_IO_PENDING",
     "ERROR_LOCK_VIOLATION",
+    "FILE_FLAG_OVERLAPPED",
     "GetOverlappedResultEx",
     "INFINITE",
     "LockFileEx",

@@ -25,6 +25,23 @@ macro_rules! flock_flag {
 }
 
 #[inline]
+pub(super) fn open_opts(exclusive: bool) -> std::fs::OpenOptions {
+    let mut o = std::fs::OpenOptions::new();
+    o.read(true);
+
+    if exclusive {
+        o.write(true).create(true);
+    }
+
+    // Since we do async I/O with waits, we need to open the file with overlapped
+    // as otherwise LockFileEx will just hang until it can take the lock
+    use std::os::windows::fs::OpenOptionsExt;
+    o.custom_flags(FileFlagsAndAttributes::FileFlagOverlapped);
+
+    o
+}
+
+#[inline]
 pub(super) fn try_lock(file: &File, state: LockState) -> Result {
     flock(
         file,

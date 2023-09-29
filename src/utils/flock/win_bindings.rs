@@ -30,6 +30,10 @@
 );
 pub const Infinite: u32 = 4294967295;
 pub type Bool = i32;
+pub mod FileFlagsAndAttributes {
+    pub type Enum = u32;
+    pub const FileFlagOverlapped: Enum = 1073741824;
+}
 pub type Handle = isize;
 pub mod LockFileFlags {
     pub type Enum = u32;
