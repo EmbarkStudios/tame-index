@@ -272,6 +272,7 @@ mod test {
     use crate::PathBuf;
 
     #[test]
+    #[cfg(target_endian = "little")]
     fn canonicalizes_git_urls() {
         let super::UrlDir { dir_name, canonical } = url_to_local_dir("git+https://github.com/EmbarkStudios/cpal.git?rev=d59b4de#d59b4decf72a96932a1482cc27fe4c0b50c40d32").unwrap();
 
@@ -321,6 +322,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(target_endian = "little")]
     fn matches_cargo() {
         assert_eq!(
             get_index_details(crate::CRATES_IO_INDEX, Some(PathBuf::new())).unwrap(),
