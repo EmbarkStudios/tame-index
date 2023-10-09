@@ -131,7 +131,7 @@ impl TreeUpdateBuilder {
                     i,
                     Entry {
                         mode: entry.mode,
-                        oid: entry.oid.clone().into(),
+                        oid: entry.oid.into(),
                         filename: entry.filename.to_owned(),
                     },
                 );
