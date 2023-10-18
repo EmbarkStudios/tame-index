@@ -89,6 +89,19 @@ impl RemoteGitIndex {
             let res = if let Some(repo) = repo {
                 (repo, None)
             } else {
+                // We need to create the directory chain ourselves, gix will fail
+                // if any parent directory is missing
+                if !index.cache.path.exists() {
+                    std::fs::create_dir_all(&index.cache.path).map_err(|source| {
+                        GitError::ClonePrep(Box::new(gix::clone::Error::Init(
+                            gix::init::Error::Init(gix::create::Error::CreateDirectory {
+                                source,
+                                path: index.cache.path.to_owned().into(),
+                            }),
+                        )))
+                    })?;
+                }
+
                 let (repo, out) = gix::prepare_clone_bare(index.url.as_str(), &index.cache.path)
                     .map_err(Box::new)?
                     .with_remote_name("origin")
