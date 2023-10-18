@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#39](https://github.com/EmbarkStudios/tame-index/pull/39) resolved [#38](https://github.com/EmbarkStudios/tame-index/issues/38) by ensuring all parent directories are created before attempting a clone with `gix`.
+
 ## [0.7.1] - 2023-09-29
 ### Fixed
 - [PR#34](https://github.com/EmbarkStudios/tame-index/pull/33) resolved a compile issue when targeting `musl` libc.
