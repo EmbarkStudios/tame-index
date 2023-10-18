@@ -96,7 +96,7 @@ impl RemoteGitIndex {
                         GitError::ClonePrep(Box::new(gix::clone::Error::Init(
                             gix::init::Error::Init(gix::create::Error::CreateDirectory {
                                 source,
-                                path: index.cache.path.to_owned().into(),
+                                path: index.cache.path.clone().into(),
                             }),
                         )))
                     })?;
