@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.7.2] - 2023-10-18
 ### Fixed
 - [PR#39](https://github.com/EmbarkStudios/tame-index/pull/39) resolved [#38](https://github.com/EmbarkStudios/tame-index/issues/38) by ensuring all parent directories are created before attempting a clone with `gix`.
 
@@ -133,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.7.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.7.2...HEAD
+[0.7.2]: https://github.com/EmbarkStudios/tame-index/compare/0.7.1...0.7.2
 [0.7.1]: https://github.com/EmbarkStudios/tame-index/compare/0.7.0...0.7.1
 [0.7.0]: https://github.com/EmbarkStudios/tame-index/compare/0.6.0...0.7.0
 [0.6.0]: https://github.com/EmbarkStudios/tame-index/compare/0.5.6...0.6.0
