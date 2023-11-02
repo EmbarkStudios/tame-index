@@ -73,7 +73,7 @@ features = ["blocking", "gzip"]
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-windows-targets = "0.48"
+windows-targets = "0.48.5"
 
 [dev-dependencies]
 cargo_metadata = "0.18"
