@@ -205,6 +205,11 @@ impl FakeRemote {
             .set_raw_value("committer", None, "email", "tests@integration.se")
             .unwrap();
 
+        // Disable GPG signing, it breaks testing if the user has it enabled
+        config
+            .set_raw_value("commit", None, "gpgsign", "false")
+            .unwrap();
+
         config.commit_auto_rollback().unwrap()
     }
 
