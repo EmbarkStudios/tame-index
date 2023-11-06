@@ -51,7 +51,7 @@ skip = [
     # toml-edit is user a newer version :p
     { name = "indexmap", version = "=1.9.3" },
     # trust-dns-resolver pulls in a new version than the rest of them use (including itself)
-    { name = "socket2", version = "=0.4.9" },
+    { name = "socket2", version = "=0.4.10" },
     # A bunch of users still of syn 1.0 :p
     { name = "syn", version = "=1.0.109" },
 ]
