@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.8.0] - 2023-11-06
 ### Fixed
 - [PR#41](https://github.com/EmbarkStudios/tame-index/pull/41) resolved [#29](https://github.com/EmbarkStudios/tame-index/issues/29) by force disabling gpg signing in test.
 - Commit e3c6ff1 bumped the patch version of `windows-targets` to .5 to prevent using older versions that don't compile (See [#40](https://github.com/EmbarkStudios/tame-index/issues/40))
@@ -141,7 +142,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.7.2...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.8.0...HEAD
+[0.8.0]: https://github.com/EmbarkStudios/tame-index/compare/0.7.2...0.8.0
 [0.7.2]: https://github.com/EmbarkStudios/tame-index/compare/0.7.1...0.7.2
 [0.7.1]: https://github.com/EmbarkStudios/tame-index/compare/0.7.0...0.7.1
 [0.7.0]: https://github.com/EmbarkStudios/tame-index/compare/0.6.0...0.7.0
