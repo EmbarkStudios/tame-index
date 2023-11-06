@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#41](https://github.com/EmbarkStudios/tame-index/pull/41) resolved [#29](https://github.com/EmbarkStudios/tame-index/issues/29) by force disabling gpg signing in test.
+- Commit e3c6ff1 bumped the patch version of `windows-targets` to .5 to prevent using older versions that don't compile (See [#40](https://github.com/EmbarkStudios/tame-index/issues/40))
+
+### Changed
+- [PR#41](https://github.com/EmbarkStudios/tame-index/pull/41) bumped `gix` -> 0.55
+
 ## [0.7.2] - 2023-10-18
 ### Fixed
 - [PR#39](https://github.com/EmbarkStudios/tame-index/pull/39) resolved [#38](https://github.com/EmbarkStudios/tame-index/issues/38) by ensuring all parent directories are created before attempting a clone with `gix`.
