@@ -72,9 +72,6 @@ features = ["blocking", "gzip"]
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
-[target.'cfg(windows)'.dependencies]
-windows-targets = "0.48.5"
-
 [dev-dependencies]
 cargo_metadata = "0.18"
 rayon = "1.7"
