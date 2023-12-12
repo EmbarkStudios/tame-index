@@ -80,7 +80,7 @@ impl TreeUpdateBuilder {
         repo: &gix::Repository,
     ) -> gix::ObjectId {
         use gix::objs::{
-            tree::{Entry, EntryMode},
+            tree::{Entry, EntryKind},
             Tree,
         };
 
@@ -94,7 +94,7 @@ impl TreeUpdateBuilder {
             match entry {
                 UpdateEntry::Blob(oid) => {
                     nt.entries.push(Entry {
-                        mode: EntryMode::Blob,
+                        mode: EntryKind::Blob.into(),
                         oid,
                         filename,
                     });
@@ -102,7 +102,7 @@ impl TreeUpdateBuilder {
                 UpdateEntry::Tree(ut) => {
                     // Check if there is already an existing tree
                     let current_tree = tree_ref.entries.iter().find_map(|tre| {
-                        if tre.filename == name && tre.mode == EntryMode::Tree {
+                        if tre.filename == name && tre.mode.is_tree() {
                             Some(repo.find_object(tre.oid).unwrap().into_tree())
                         } else {
                             None
@@ -112,7 +112,7 @@ impl TreeUpdateBuilder {
 
                     let oid = Self::create_inner(ut, &current_tree, repo);
                     nt.entries.push(Entry {
-                        mode: EntryMode::Tree,
+                        mode: EntryKind::Tree.into(),
                         oid,
                         filename,
                     });

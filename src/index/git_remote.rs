@@ -412,7 +412,7 @@ pub enum GitError {
     #[error(transparent)]
     ReferenceLookup(#[from] Box<gix::reference::find::existing::Error>),
     #[error(transparent)]
-    BlobLookup(#[from] Box<gix::odb::find::existing::Error>),
+    BlobLookup(#[from] Box<gix::object::find::existing::Error>),
     #[error(transparent)]
     RemoteLookup(#[from] Box<gix::remote::find::existing::Error>),
     #[error(transparent)]
