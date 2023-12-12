@@ -82,7 +82,7 @@ impl<'pb> LockOptions<'pb> {
 
         Ok(Self {
             path: path.into(),
-            exclusive: false,
+            exclusive: true,
             shared_fallback: false,
         })
     }
