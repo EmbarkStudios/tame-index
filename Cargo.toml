@@ -59,7 +59,7 @@ twox-hash = { version = "1.6", default-features = false }
 
 [dependencies.gix]
 optional = true
-version = "0.55"
+version = "0.56"
 default-features = false
 features = ["blocking-http-transport-reqwest"]
 
@@ -71,9 +71,6 @@ features = ["blocking", "gzip"]
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-
-[target.'cfg(windows)'.dependencies]
-windows-targets = "0.48.5"
 
 [dev-dependencies]
 cargo_metadata = "0.18"
