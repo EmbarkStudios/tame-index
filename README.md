@@ -27,6 +27,7 @@
 1. Functionality for writing cache entries to the local index cache is exposed in the public API
 1. [`Local Registry`](https://doc.rust-lang.org/cargo/reference/source-replacement.html#local-registry-sources) support is available behind the `local` feature flag
 1. Building of local registries is available behind the `local-builder` feature flag
+1. File-based locking compatible with Cargo is available to ensure `tame-index` and Cargo can play nicely together.
 
 ## Contributing
 
