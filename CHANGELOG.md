@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#44](https://github.com/EmbarkStudios/tame-index/pull/44) bumped `gix` -> 0.57
+
 ## [0.9.0] - 2023-12-13
 ### Fixed
 - [PR#43](https://github.com/EmbarkStudios/tame-index/pull/43) fixed the file lock options from `LockOptions::cargo_package_lock` to be `exclusive` to more closely match Cargo's behavior. This would not have been a problem in practice, but is more correct now.
