@@ -391,7 +391,7 @@ mod remote {
 
     /// Reuses connections. This test is intended to be run under strace to
     /// validate that <n> connections are not being created
-    /// https://github.com/EmbarkStudios/tame-index/issues/46
+    /// <https://github.com/EmbarkStudios/tame-index/issues/46>
     #[test]
     fn reuses_connection() {
         let td = utils::tempdir();
@@ -402,7 +402,7 @@ mod remote {
         let rsi = tame_index::index::RemoteSparseIndex::new(index, client);
 
         let results = rsi.krates(
-            KRATES.into_iter().map(|s| s.to_string()).collect(),
+            KRATES.iter().map(|s| (*s).to_string()).collect(),
             false,
             lock,
         );
@@ -425,7 +425,7 @@ mod remote {
 
         let results = rsi
             .krates_blocking(
-                KRATES.into_iter().map(|s| s.to_string()).collect(),
+                KRATES.iter().map(|s| (*s).to_string()).collect(),
                 false,
                 None,
                 lock,
