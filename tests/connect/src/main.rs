@@ -57,7 +57,7 @@ fn main() {
         .parse()
         .unwrap();
 
-    let max = proc_count + 5;
+    let max = proc_count + (proc_count as f32 * 0.05).floor() as usize;
 
     for test in ["reuses_connection", "async_reuses_connection"] {
         assert!(
