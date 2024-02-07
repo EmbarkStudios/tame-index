@@ -74,23 +74,12 @@ impl RemoteSparseIndex {
     #[inline]
     pub fn krates(
         &self,
-        mut krates: BTreeSet<String>,
+        krates: BTreeSet<String>,
         write_cache_entries: bool,
         lock: &FileLock,
     ) -> BTreeMap<String, Result<Option<IndexKrate>, Error>> {
-        let Some(prep_krate) = krates.pop_last() else {
-            return Default::default();
-        };
-
-        let prep = || {
-            let name = prep_krate.as_str().try_into()?;
-            self.krate(name, write_cache_entries, lock)
-        };
-
-        let prep_krate_res = prep();
-
         use rayon::prelude::*;
-        let mut results: BTreeMap<_, _> = krates
+        krates
             .into_par_iter()
             .map(|kname| {
                 let res = || {
@@ -100,10 +89,7 @@ impl RemoteSparseIndex {
                 let res = res();
                 (kname, res)
             })
-            .collect();
-
-        results.insert(prep_krate, prep_krate_res);
-        results
+            .collect()
     }
 }
 
@@ -198,44 +184,14 @@ impl AsyncRemoteSparseIndex {
     /// via something like [`tokio::time::timeout`](https://docs.rs/tokio/latest/tokio/time/fn.timeout.html)
     pub async fn krates(
         &self,
-        mut krates: BTreeSet<String>,
+        krates: BTreeSet<String>,
         write_cache_entries: bool,
         individual_timeout: Option<std::time::Duration>,
         lock: &FileLock,
     ) -> BTreeMap<String, Result<Option<IndexKrate>, Error>> {
-        let Some(prep_krate) = krates.pop_last() else {
-            return Default::default();
-        };
-
-        let create_req = |kname: &str| -> Result<http::Request<&'static [u8]>, Error> {
-            let name = kname.try_into()?;
-            self.index.make_remote_request(name, None, lock)
-        };
-
-        let mut results = BTreeMap::new();
-
-        {
-            let result;
-            match create_req(&prep_krate).and_then(|req| Ok(req.try_into()?)) {
-                Ok(req) => match Self::exec_request(&self.client, req).await {
-                    Ok(res) => {
-                        result = self.index.parse_remote_response(
-                            prep_krate.as_str().try_into().unwrap(),
-                            res,
-                            write_cache_entries,
-                            lock,
-                        );
-                    }
-                    Err(err) => result = Err(err),
-                },
-                Err(err) => result = Err(err),
-            }
-
-            results.insert(prep_krate, result);
-        }
-
         let mut tasks = tokio::task::JoinSet::new();
 
+        let mut results = BTreeMap::new();
         for kname in krates {
             match kname.as_str().try_into().and_then(|name| {
                 Ok(self
