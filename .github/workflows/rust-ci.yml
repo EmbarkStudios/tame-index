@@ -45,6 +45,7 @@ jobs:
       - name: cargo test
         run: cargo test ${{ matrix.features }}
       - name: Test connection reuse
+        if: ${{ matrix.features == '--features sparse' }}
         run: |
           cargo run --manifest-path tests/connect/Cargo.toml
 
