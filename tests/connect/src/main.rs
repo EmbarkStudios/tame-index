@@ -48,31 +48,6 @@ fn main() {
         ts = mt;
     }
 
-    assert!(
-        std::process::Command::new("strace")
-            .args([
-                "-f",
-                "-e",
-                "trace=connect",
-                "-o",
-                "/tmp/tame-index-connection-trace"
-            ])
-            .arg(latest)
-            .arg("reuses_connection")
-            .status()
-            .unwrap()
-            .success(),
-        "failed to strace test"
-    );
-
-    let trace = std::fs::read_to_string("/tmp/tame-index-connection-trace")
-        .expect("failed to read strace output");
-
-    let connection_counts = trace
-        .lines()
-        .filter(|line| line.contains("connect("))
-        .count();
-
     // The connection count should be roughly the same as the processor count
     let stdout = std::process::Command::new("nproc").output().unwrap().stdout;
 
@@ -81,9 +56,39 @@ fn main() {
         .trim()
         .parse()
         .unwrap();
+
     let max = proc_count + 5;
-    assert!(
-        connection_counts <= max,
-        "connection syscalls ({connection_counts}) should be lower than {max}"
-    );
+
+    for test in ["reuses_connection", "async_reuses_connection"] {
+        assert!(
+            std::process::Command::new("strace")
+                .args([
+                    "-f",
+                    "-e",
+                    "trace=connect",
+                    "-o",
+                    "/tmp/tame-index-connection-trace"
+                ])
+                .arg(&latest)
+                .arg("--exact")
+                .arg(format!("remote::{test}"))
+                .status()
+                .unwrap()
+                .success(),
+            "failed to strace test"
+        );
+
+        let trace = std::fs::read_to_string("/tmp/tame-index-connection-trace")
+            .expect("failed to read strace output");
+
+        let connection_counts = trace
+            .lines()
+            .filter(|line| line.contains("connect("))
+            .count();
+
+        assert!(
+            connection_counts <= max,
+            "connection syscalls ({connection_counts}) should be lower than {max}"
+        );
+    }
 }
