@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#47](https://github.com/EmbarkStudios/tame-index/pull/47) fixed [#46](https://github.com/EmbarkStudios/tame-index/issues/46) by ensuring one full DNS lookup and request response roundtrip is made before going wide to ensure that excessive DNS lookups and connections are not made.
+
 ## [0.9.2] - 2024-01-21
 ### Changed
 - [PR#45](https://github.com/EmbarkStudios/tame-index/pull/45) bumped `gix` -> 0.58
