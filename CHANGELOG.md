@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.9.3] - 2024-02-07
 ### Fixed
 - [PR#47](https://github.com/EmbarkStudios/tame-index/pull/47) fixed [#46](https://github.com/EmbarkStudios/tame-index/issues/46) by ensuring one full DNS lookup and request response roundtrip is made before going wide to ensure that excessive DNS lookups and connections are not made.
 
@@ -160,7 +161,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.9.2...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.9.3...HEAD
+[0.9.3]: https://github.com/EmbarkStudios/tame-index/compare/0.9.2...0.9.3
 [0.9.2]: https://github.com/EmbarkStudios/tame-index/compare/0.9.1...0.9.2
 [0.9.1]: https://github.com/EmbarkStudios/tame-index/compare/0.9.0...0.9.1
 [0.9.0]: https://github.com/EmbarkStudios/tame-index/compare/0.8.0...0.9.0
