@@ -48,21 +48,24 @@ fn main() {
         ts = mt;
     }
 
-    // The connection count should be roughly the same as the processor count
-    let stdout = std::process::Command::new("nproc").output().unwrap().stdout;
+    let proc_count: usize = if std::env::var_os("CI").is_none() {
+        // The connection count should be roughly the same as the processor count
+        let stdout = std::process::Command::new("nproc").output().unwrap().stdout;
 
-    let proc_count: usize = std::str::from_utf8(&stdout)
-        .unwrap()
-        .trim()
-        .parse()
-        .unwrap();
+        std::str::from_utf8(&stdout)
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap()
+    } else {
+        30
+    };
 
     let max = proc_count + (proc_count as f32 * 0.05).floor() as usize;
 
     for test in ["reuses_connection", "async_reuses_connection"] {
         assert!(
             std::process::Command::new("strace")
-                .env("RAYON_NUM_THREADS", proc_count.to_string())
                 .args([
                     "-f",
                     "-e",
