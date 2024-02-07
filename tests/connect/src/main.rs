@@ -62,6 +62,7 @@ fn main() {
     for test in ["reuses_connection", "async_reuses_connection"] {
         assert!(
             std::process::Command::new("strace")
+                .env("RAYON_NUM_THREADS", proc_count.to_string())
                 .args([
                     "-f",
                     "-e",
