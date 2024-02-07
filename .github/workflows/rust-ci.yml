@@ -44,6 +44,9 @@ jobs:
         run: cargo build --tests ${{ matrix.features }}
       - name: cargo test
         run: cargo test ${{ matrix.features }}
+      - name: Test connection reuse
+        run: |
+          cargo run --manifest-path tests/connect/Cargo.toml
 
   deny-check:
     name: cargo-deny
