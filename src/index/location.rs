@@ -68,18 +68,17 @@ impl<'iu> IndexUrl<'iu> {
             Some("sparse") => true,
             Some("git") => false,
             _ => {
-                let sparse_index = read_cargo_config(config_root, cargo_home, |config| {
-                    config
-                        .get("registries")
-                        .and_then(|v| v.get("crates-io"))
-                        .and_then(|v| v.get("protocol"))
-                        .and_then(|v| v.as_str())
-                        .and_then(|v| match v {
+                let sparse_index =
+                    read_cargo_config(config_root, cargo_home, |config| {
+                        match config
+                            .pointer("/registries/crates-io/protocol")
+                            .and_then(|p| p.as_str())?
+                        {
                             "sparse" => Some(true),
                             "git" => Some(false),
                             _ => None,
-                        })
-                })?;
+                        }
+                    })?;
 
                 if let Some(si) = sparse_index {
                     si
@@ -196,7 +195,7 @@ impl<'il> IndexLocation<'il> {
 pub(crate) fn read_cargo_config<T>(
     root: Option<PathBuf>,
     cargo_home: Option<&Path>,
-    callback: impl Fn(&toml::Value) -> Option<T>,
+    callback: impl Fn(&toml_span::value::Value<'_>) -> Option<T>,
 ) -> Result<Option<T>, Error> {
     if let Some(mut path) = root.or_else(|| {
         std::env::current_dir()
@@ -211,7 +210,7 @@ pub(crate) fn read_cargo_config<T>(
                     Err(err) => return Err(Error::IoPath(err, path)),
                 };
 
-                let toml: toml::Value = toml::from_str(&contents).map_err(Box::new)?;
+                let toml = toml_span::parse(&contents).map_err(Box::new)?;
                 if let Some(value) = callback(&toml) {
                     return Ok(Some(value));
                 }
@@ -232,8 +231,8 @@ pub(crate) fn read_cargo_config<T>(
     {
         let path = home.join("config.toml");
         if path.exists() {
-            let toml: toml::Value =
-                toml::from_str(&std::fs::read_to_string(&path)?).map_err(Box::new)?;
+            let fc = std::fs::read_to_string(&path)?;
+            let toml = toml_span::parse(&fc).map_err(Box::new)?;
             if let Some(value) = callback(&toml) {
                 return Ok(Some(value));
             }
@@ -252,25 +251,19 @@ pub(crate) fn get_crates_io_replacement<'iu>(
     cargo_home: Option<&Path>,
 ) -> Result<Option<IndexUrl<'iu>>, Error> {
     read_cargo_config(root, cargo_home, |config| {
-        config.get("source").and_then(|sources| {
-            sources
-                .get("crates-io")
-                .and_then(|v| v.get("replace-with"))
-                .and_then(|v| v.as_str())
-                .and_then(|v| sources.get(v))
-                .and_then(|v| {
-                    v.get("registry")
-                        .and_then(|reg| {
-                            reg.as_str()
-                                .map(|r| IndexUrl::NonCratesIo(r.to_owned().into()))
-                        })
-                        .or_else(|| {
-                            v.get("local-registry").and_then(|l| {
-                                l.as_str().map(|l| IndexUrl::Local(PathBuf::from(l).into()))
-                            })
-                        })
-                })
-        })
+        let repw = config.pointer("/source/crates-io/replace-with")?.as_str()?;
+        let sources = config.pointer("/source")?.as_table()?;
+        let replace_src = sources.get(&repw.into())?.as_table()?;
+
+        if let Some(rr) = replace_src.get(&"registry".into()) {
+            rr.as_str()
+                .map(|r| IndexUrl::NonCratesIo(r.to_owned().into()))
+        } else if let Some(rlr) = replace_src.get(&"local-registry".into()) {
+            rlr.as_str()
+                .map(|l| IndexUrl::Local(PathBuf::from(l).into()))
+        } else {
+            None
+        }
     })
 }
 
@@ -287,5 +280,48 @@ mod test {
             .unwrap(),
             crate::index::ComboIndexCache::Sparse(_)
         ));
+    }
+
+    /// Verifies we can parse .cargo/config.toml files to either use the crates-io
+    /// protocol set, or source replacements
+    #[test]
+    fn parses_from_file() {
+        assert!(std::env::var_os("CARGO_REGISTRIES_CRATES_IO_PROTOCOL").is_none());
+
+        let td = tempfile::tempdir().unwrap();
+        let root = crate::PathBuf::from_path_buf(td.path().to_owned()).unwrap();
+        let cfg_toml = td.path().join(".cargo/config.toml");
+
+        std::fs::create_dir_all(cfg_toml.parent().unwrap()).unwrap();
+
+        const GIT: &str = r#"[registries.crates-io]
+protocol = "git"
+"#;
+
+        // First just set the protocol from the sparse default to git
+        std::fs::write(&cfg_toml, GIT).unwrap();
+
+        let iurl = super::IndexUrl::crates_io(Some(root.clone()), None, None).unwrap();
+        assert_eq!(iurl.as_str(), crate::CRATES_IO_INDEX);
+        assert!(!iurl.is_sparse());
+
+        // Next set replacement registries
+        for (i, (kind, url)) in [
+            (
+                "registry",
+                "sparse+https://sparse-registry-parses-from-file.com",
+            ),
+            ("registry", "https://sparse-registry-parses-from-file.git"),
+            ("local-registry", root.as_str()),
+        ]
+        .iter()
+        .enumerate()
+        {
+            std::fs::write(&cfg_toml, format!("{GIT}\n[source.crates-io]\nreplace-with = 'replacement'\n[source.replacement]\n{kind} = '{url}'")).unwrap();
+
+            let iurl = super::IndexUrl::crates_io(Some(root.clone()), None, None).unwrap();
+            assert_eq!(i == 0, iurl.is_sparse());
+            assert_eq!(iurl.as_str(), *url);
+        }
     }
 }
