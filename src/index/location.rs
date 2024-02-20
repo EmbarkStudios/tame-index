@@ -320,7 +320,7 @@ protocol = "git"
             std::fs::write(&cfg_toml, format!("{GIT}\n[source.crates-io]\nreplace-with = 'replacement'\n[source.replacement]\n{kind} = '{url}'")).unwrap();
 
             let iurl = super::IndexUrl::crates_io(Some(root.clone()), None, None).unwrap();
-            assert_eq!(i == 0, dbg!(&iurl).is_sparse());
+            assert_eq!(i == 0, iurl.is_sparse());
             assert_eq!(iurl.as_str(), *url);
         }
     }
