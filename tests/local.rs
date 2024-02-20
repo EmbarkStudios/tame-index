@@ -36,7 +36,13 @@ fn builds_local_registry() {
         let ip = krates.entry(pkg.name.clone()).or_insert_with(|| {
             let ik = sparse
                 .cached_krate(pkg.name.as_str().try_into().unwrap(), &lock)
+                .map_err(|e| {
+                    panic!("failed to read cache entry for {}: {e}", pkg.name);
+                })
                 .unwrap()
+                .ok_or_else(|| {
+                    panic!("no cache entry for {}", pkg.name);
+                })
                 .unwrap();
 
             IndexPkg {
