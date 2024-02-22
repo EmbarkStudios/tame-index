@@ -2063,9 +2063,9 @@ dependencies = [
 
 [[package]]
 name = "toml-span"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32c5896fa509a428e0ffcb1e37c7954f183a507784cd2999cb76c3b7544bf52d"
+checksum = "369db38ce6d1fc320a54ea3f032d07c07a232ca19c40e287246aff06d57c2abe"
 dependencies = [
  "smallvec",
 ]
