@@ -136,7 +136,7 @@ impl LocalRegistry {
         name: KrateName<'_>,
         _lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
-        let index_path = make_path(&self.path, name);
+        let index_path = self.krate_path(name);
 
         let buf = match std::fs::read(&index_path) {
             Ok(buf) => buf,
@@ -145,6 +145,15 @@ impl LocalRegistry {
         };
 
         Ok(Some(IndexKrate::from_slice(&buf)?))
+    }
+
+    /// Gets the path to the index entry for the krate.
+    ///
+    /// Note that unlike .cache entries for git and sparse indices, these are not
+    /// binary files, they are just the JSON line format
+    #[inline]
+    pub fn krate_path(&self, name: KrateName<'_>) -> PathBuf {
+        make_path(&self.path, name)
     }
 }
 

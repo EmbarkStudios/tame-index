@@ -115,8 +115,7 @@ pub enum ComboIndexCache {
 }
 
 impl ComboIndexCache {
-    /// Retrieves the index metadata for the specified crate name, optionally
-    /// writing a cache entry for it if there was not already an up to date one
+    /// Retrieves the index metadata for the specified crate name
     #[inline]
     pub fn cached_krate(
         &self,
@@ -128,6 +127,16 @@ impl ComboIndexCache {
             Self::Sparse(index) => index.cached_krate(name, lock),
             #[cfg(feature = "local")]
             Self::Local(lr) => lr.cached_krate(name, lock),
+        }
+    }
+
+    /// Gets the path to the cache entry for the specified crate
+    pub fn cache_path(&self, name: crate::KrateName<'_>) -> crate::PathBuf {
+        match self {
+            Self::Git(index) => index.cache.cache_path(name),
+            Self::Sparse(index) => index.cache().cache_path(name),
+            #[cfg(feature = "local")]
+            Self::Local(lr) => lr.krate_path(name),
         }
     }
 
