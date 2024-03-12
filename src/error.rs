@@ -22,7 +22,7 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     /// An I/O error occurred trying to access a specific path
-    #[error("I/O operation failed for path '{}'", .1)]
+    #[error("I/O operation failed for path '{}': {}", .1, .0)]
     IoPath(#[source] std::io::Error, crate::PathBuf),
     /// A user provided URL was invalid
     #[error(transparent)]
