@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#52](https://github.com/EmbarkStudios/tame-index/pull/52) added `ComboIndexCache::cache_path` to retrieve the path of a particular crate's index entry.
+
 ## [0.9.6] - 2024-03-12
 ### Changed
 - [PR#51](https://github.com/EmbarkStudios/tame-index/pull/51) updated dependencies.
