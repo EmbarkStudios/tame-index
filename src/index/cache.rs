@@ -12,15 +12,19 @@
 //! responses from servers to tell the client they have the latest version if
 //! that crate has not been changed since it was last accessed.
 //!
+//! ```txt
 //! +-------------------+---------------------------+------------------+---+
 //! | cache version :u8 | index format version :u32 | revision :string | 0 |
 //! +-------------------+---------------------------+------------------+---+
+//! ```
 //!
 //! followed by 1+
 //!
+//! ```txt
 //! +----------------+---+-----------+---+
 //! | semver version | 0 | JSON blob | 0 |
 //! +----------------+---+-----------+---+
+//! ```
 
 /// The current (cargo 1.54.0+) cache version for cache entries.
 ///
