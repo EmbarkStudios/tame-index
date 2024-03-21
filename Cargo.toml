@@ -59,10 +59,11 @@ twox-hash = { version = "1.6", default-features = false }
 
 [dependencies.gix]
 optional = true
-version = "0.60"
+version = "0.61"
 default-features = false
 features = ["blocking-http-transport-reqwest"]
 
+# Keep version aligned with gix-transport
 [dependencies.reqwest]
 optional = true
 version = "0.11"
