@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.9.9] - 2024-03-21
 ### Changed
 - [PR#54](https://github.com/EmbarkStudios/tame-index/pull/54) updated `gix` -> 0.61.
 
@@ -184,7 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.9.8...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.9.9...HEAD
+[0.9.9]: https://github.com/EmbarkStudios/tame-index/compare/0.9.8...0.9.9
 [0.9.8]: https://github.com/EmbarkStudios/tame-index/compare/0.9.7...0.9.8
 [0.9.7]: https://github.com/EmbarkStudios/tame-index/compare/0.9.6...0.9.7
 [0.9.6]: https://github.com/EmbarkStudios/tame-index/compare/0.9.5...0.9.6
