@@ -87,6 +87,7 @@ fn can_take_shared_lock() {
 
     let _ = std::fs::OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(&ctl)
         .expect("failed to create lock file");
@@ -116,6 +117,7 @@ fn waits_lock() {
 
     let _ = std::fs::OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(&ctl)
         .expect("failed to create lock file");
@@ -146,6 +148,7 @@ fn wait_lock_times_out() {
 
     let _ = std::fs::OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(&ctl)
         .expect("failed to create lock file");
