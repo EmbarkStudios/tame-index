@@ -32,7 +32,7 @@ crossbeam-channel = { version = "0.5", optional = true }
 # Used to find the location of the local `CARGO_HOME`
 home = "0.5"
 # Allows calling crates to provide their own HTTP implementation, keep aligned with reqwest/hyper
-http = "0.2"
+http = "1.1.0"
 # Nicer scanning through bytes
 memchr = "2.5"
 rayon = { version = "1.7", optional = true }
@@ -66,7 +66,7 @@ features = ["blocking-http-transport-reqwest"]
 # Keep version aligned with gix-transport
 [dependencies.reqwest]
 optional = true
-version = "0.11"
+version = "0.12"
 default-features = false
 features = ["blocking", "gzip"]
 
