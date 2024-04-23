@@ -89,6 +89,8 @@ impl RemoteSparseIndex {
 
         let prep_krate_res = prep();
 
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
         use rayon::prelude::*;
         let mut results: BTreeMap<_, _> = krates
             .into_par_iter()
