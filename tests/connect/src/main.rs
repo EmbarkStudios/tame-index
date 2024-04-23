@@ -48,51 +48,55 @@ fn main() {
         ts = mt;
     }
 
-    let proc_count: usize = if std::env::var_os("CI").is_none() {
-        // The connection count should be roughly the same as the processor count
-        let stdout = std::process::Command::new("nproc").output().unwrap().stdout;
-
-        std::str::from_utf8(&stdout)
-            .unwrap()
-            .trim()
-            .parse()
-            .unwrap()
-    } else {
-        30
-    };
-
-    let max = proc_count + (proc_count as f32 * 0.05).floor() as usize;
+    // At this moment, crates.io should resolve to 4 IPv4 addresses, so we expect
+    // those 4, as well as the TLS connection
 
     for test in ["reuses_connection", "async_reuses_connection"] {
+        let path = format!("/tmp/tame-index-connection-trace-{test}");
         assert!(
             std::process::Command::new("strace")
-                .args([
-                    "-f",
-                    "-e",
-                    "trace=connect",
-                    "-o",
-                    "/tmp/tame-index-connection-trace"
-                ])
+                .args(["-f", "-e", "trace=connect", "-o", &path])
                 .arg(&latest)
                 .arg("--exact")
                 .arg(format!("remote::{test}"))
+                .arg("--nocapture")
+                .env("RUST_LOG", "debug")
                 .status()
                 .unwrap()
                 .success(),
             "failed to strace test"
         );
 
-        let trace = std::fs::read_to_string("/tmp/tame-index-connection-trace")
-            .expect("failed to read strace output");
+        let trace = std::fs::read_to_string(path).expect("failed to read strace output");
 
-        let connection_counts = trace
+        let (connect_count, tls_count) = trace
             .lines()
-            .filter(|line| line.contains("connect("))
-            .count();
+            .filter_map(|line| {
+                if !line.contains("connect(") {
+                    return None;
+                }
 
-        assert!(
-            connection_counts <= max,
-            "connection syscalls ({connection_counts}) should be lower than {max}"
-        );
+                if !line.contains("sa_family=AF_INET") {
+                    return None;
+                }
+
+                if line.contains("sin_port=htons(0)") && line.ends_with(" = 0") {
+                    Some((1, 0))
+                } else if line.contains("sin_port=htons(443)")
+                    && line.ends_with(" = -1 EINPROGRESS (Operation now in progress)")
+                {
+                    Some((0, 1))
+                } else {
+                    None
+                }
+            })
+            .fold((0, 0), |acc, i| (acc.0 + i.0, acc.1 + i.1));
+
+        if connect_count != 4 || tls_count != 1 {
+            if std::env::var_os("CI").is_some() {
+                eprintln!("{trace}");
+            }
+            panic!("should have established 4 (but got {connect_count}) connections and 1 (but got {tls_count}) TLS connection");
+        }
     }
 }

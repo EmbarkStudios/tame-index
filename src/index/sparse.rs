@@ -97,7 +97,7 @@ impl SparseIndex {
         name: KrateName<'_>,
         etag: Option<&str>,
         lock: &FileLock,
-    ) -> Result<http::Request<&'static [u8]>, Error> {
+    ) -> Result<http::Request<()>, Error> {
         use http::header;
 
         let url = self.crate_url(name);
@@ -166,8 +166,7 @@ impl SparseIndex {
             }
         }
 
-        const EMPTY: &[u8] = &[];
-        Ok(req.body(EMPTY).unwrap())
+        Ok(req.body(()).unwrap())
     }
 
     /// Process the response to a request created by [`Self::make_remote_request`]

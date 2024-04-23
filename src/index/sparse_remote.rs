@@ -33,9 +33,22 @@ impl RemoteSparseIndex {
         lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
         let req = self.index.make_remote_request(name, None, lock)?;
-        let req = req.try_into()?;
+        let (
+            http::request::Parts {
+                method,
+                uri,
+                version,
+                headers,
+                ..
+            },
+            _,
+        ) = req.into_parts();
 
-        let res = self.client.execute(req)?;
+        let mut req = self.client.request(method, uri.to_string());
+        req = req.version(version);
+        req = req.headers(headers);
+
+        let res = self.client.execute(req.build()?)?;
 
         let mut builder = http::Response::builder()
             .status(res.status())
@@ -130,11 +143,24 @@ impl AsyncRemoteSparseIndex {
         write_cache_entry: bool,
         lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
-        let req = self
-            .index
-            .make_remote_request(name, None, lock)?
-            .try_into()?;
-        let res = Self::exec_request(&self.client, req).await?;
+        let req = self.index.make_remote_request(name, None, lock)?;
+
+        let (
+            http::request::Parts {
+                method,
+                uri,
+                version,
+                headers,
+                ..
+            },
+            _,
+        ) = req.into_parts();
+
+        let mut req = self.client.request(method, uri.to_string());
+        req = req.version(version);
+        req = req.headers(headers);
+
+        let res = Self::exec_request(&self.client, req.build()?).await?;
 
         self.index
             .parse_remote_response(name, res, write_cache_entry, lock)
@@ -207,16 +233,33 @@ impl AsyncRemoteSparseIndex {
             return Default::default();
         };
 
-        let create_req = |kname: &str| -> Result<http::Request<&'static [u8]>, Error> {
+        let create_req = |kname: &str| -> Result<reqwest::Request, Error> {
             let name = kname.try_into()?;
-            self.index.make_remote_request(name, None, lock)
+            let req = self.index.make_remote_request(name, None, lock)?;
+
+            let (
+                http::request::Parts {
+                    method,
+                    uri,
+                    version,
+                    headers,
+                    ..
+                },
+                _,
+            ) = req.into_parts();
+
+            let mut req = self.client.request(method, uri.to_string());
+            req = req.version(version);
+            req = req.headers(headers);
+
+            Ok(req.build()?)
         };
 
         let mut results = BTreeMap::new();
 
         {
             let result;
-            match create_req(&prep_krate).and_then(|req| Ok(req.try_into()?)) {
+            match create_req(&prep_krate) {
                 Ok(req) => match Self::exec_request(&self.client, req).await {
                     Ok(res) => {
                         result = self.index.parse_remote_response(
@@ -237,12 +280,7 @@ impl AsyncRemoteSparseIndex {
         let mut tasks = tokio::task::JoinSet::new();
 
         for kname in krates {
-            match kname.as_str().try_into().and_then(|name| {
-                Ok(self
-                    .index
-                    .make_remote_request(name, None, lock)?
-                    .try_into()?)
-            }) {
+            match create_req(kname.as_str()) {
                 Ok(req) => {
                     let client = self.client.clone();
                     tasks.spawn(async move {
