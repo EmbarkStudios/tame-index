@@ -55,10 +55,12 @@ fn main() {
         let path = format!("/tmp/tame-index-connection-trace-{test}");
         assert!(
             std::process::Command::new("strace")
-                .args(["-f", "-e", "trace=connect", "-o", &path,])
+                .args(["-f", "-e", "trace=connect", "-o", &path])
                 .arg(&latest)
                 .arg("--exact")
                 .arg(format!("remote::{test}"))
+                .arg("--nocapture")
+                .env("RUST_LOG", "debug")
                 .status()
                 .unwrap()
                 .success(),
@@ -91,8 +93,10 @@ fn main() {
             .fold((0, 0), |acc, i| (acc.0 + i.0, acc.1 + i.1));
 
         if connect_count != 4 || tls_count != 1 {
-            eprintln!("{trace}");
-            panic!("should have established 4 connections and 1 TLS connection");
+            if std::env::var_os("CI").is_some() {
+                eprintln!("{trace}");
+            }
+            panic!("should have established 4 (but got {connect_count}) connections and 1 (but got {tls_count}) TLS connection");
         }
     }
 }
