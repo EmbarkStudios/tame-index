@@ -64,15 +64,10 @@ fn main() {
     let max = proc_count + (proc_count as f32 * 0.05).floor() as usize;
 
     for test in ["reuses_connection", "async_reuses_connection"] {
+        let path = format!("/tmp/tame-index-connection-trace-{test}");
         assert!(
             std::process::Command::new("strace")
-                .args([
-                    "-f",
-                    "-e",
-                    "trace=connect",
-                    "-o",
-                    "/tmp/tame-index-connection-trace"
-                ])
+                .args(["-f", "-e", "trace=connect", "-o", &path,])
                 .arg(&latest)
                 .arg("--exact")
                 .arg(format!("remote::{test}"))
@@ -82,13 +77,16 @@ fn main() {
             "failed to strace test"
         );
 
-        let trace = std::fs::read_to_string("/tmp/tame-index-connection-trace")
-            .expect("failed to read strace output");
+        let trace = std::fs::read_to_string(path).expect("failed to read strace output");
 
         let connection_counts = trace
             .lines()
             .filter(|line| line.contains("connect("))
             .count();
+
+        if std::env::var_os("CI").is_some() {
+            println!("{trace}");
+        }
 
         assert!(
             connection_counts <= max,
