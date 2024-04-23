@@ -68,7 +68,7 @@ features = ["blocking-http-transport-reqwest"]
 optional = true
 version = "0.12"
 default-features = false
-features = ["blocking", "gzip"]
+features = ["blocking", "gzip", "http2"]
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
