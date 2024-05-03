@@ -15,9 +15,16 @@ pub enum Error {
     /// was not valid utf-8
     #[error("unable to use non-utf8 path {:?}", .0)]
     NonUtf8Path(std::path::PathBuf),
+    /// An environment variable was located, but had a non-utf8 value
+    #[error("environment variable {} has a non-utf8 value", .0)]
+    NonUtf8EnvVar(std::borrow::Cow<'static, str>),
     /// A user-provided string was not a valid crate name
     #[error(transparent)]
     InvalidKrateName(#[from] InvalidKrateName),
+    /// The user specified a registry name that did not exist in any searched
+    /// .cargo/config.toml
+    #[error("registry '{}' was not located in any .cargo/config.toml", .0)]
+    UnknownRegistry(String),
     /// An I/O error
     #[error(transparent)]
     Io(#[from] std::io::Error),
