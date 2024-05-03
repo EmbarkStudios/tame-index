@@ -450,5 +450,14 @@ index = "sparse+https://some-url.com"
 
             std::env::remove_var("CARGO_REGISTRIES_TAME_INDEX_TEST_INDEX");
         }
+
+        #[allow(unused_variables)]
+        {
+            let err = crate::Error::UnknownRegistry("non-existant".to_owned());
+            assert!(matches!(
+                super::IndexUrl::for_registry_name(Some(root.clone()), None, "non-existant"),
+                Err(err),
+            ));
+        }
     }
 }
