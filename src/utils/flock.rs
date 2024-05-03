@@ -30,7 +30,7 @@ pub enum LockError {
     #[error("failed to create parent directories for lock path")]
     CreateDir(std::io::Error),
     /// Locking is not supported if the lock file is on an NFS, though note this
-    /// is a bit more nuanced as NFSv4 _does_ support file locking, but is out
+    /// is a bit more nuanced as `NFSv4` _does_ support file locking, but is out
     /// of scope, at least for now
     #[error("NFS do not support locking")]
     Nfs,

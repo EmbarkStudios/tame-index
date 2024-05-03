@@ -57,7 +57,9 @@ impl<'iu> IndexUrl<'iu> {
     ) -> Result<Self, Error> {
         // If the crates.io registry has been replaced it doesn't matter what
         // the protocol for it has been changed to
-        if let Some(replacement) = get_crates_io_replacement(config_root.clone(), cargo_home)? {
+        if let Some(replacement) =
+            get_source_replacement(config_root.clone(), cargo_home, "crates-io")?
+        {
             return Ok(replacement);
         }
 
@@ -98,6 +100,64 @@ impl<'iu> IndexUrl<'iu> {
         } else {
             Self::CratesIoGit
         })
+    }
+
+    /// Creates an [`IndexUrl`] for the specified registry name
+    ///
+    /// 1. Checks if [`CARGO_REGISTRIES_<name>_INDEX`](https://doc.rust-lang.org/cargo/reference/config.html#registriesnameindex) is set
+    /// 2. Checks if the source for the registry has been [replaced](https://doc.rust-lang.org/cargo/reference/source-replacement.html)
+    /// 3. Uses the value of [`registries.<name>.index`](https://doc.rust-lang.org/cargo/reference/config.html#registriesnameindex) otherwise
+    pub fn for_registry_name(
+        config_root: Option<PathBuf>,
+        cargo_home: Option<&Path>,
+        registry_name: &str,
+    ) -> Result<Self, Error> {
+        // Check if the index was explicitly specified
+        let mut env = String::with_capacity(17 + registry_name.len() + 6);
+        env.push_str("CARGO_REGISTRIES_");
+
+        if registry_name.is_ascii() {
+            for c in registry_name.chars() {
+                if c == '-' {
+                    env.push('_');
+                } else {
+                    env.push(c.to_ascii_uppercase());
+                }
+            }
+        } else {
+            let mut upper = registry_name.to_uppercase();
+            if upper.contains('-') {
+                upper = upper.replace('-', "_");
+            }
+
+            env.push_str(&upper);
+        }
+
+        env.push_str("_INDEX");
+
+        match std::env::var(&env) {
+            Ok(index) => return Ok(Self::NonCratesIo(index.into())),
+            Err(err) => {
+                if let std::env::VarError::NotUnicode(_nu) = err {
+                    return Err(Error::NonUtf8EnvVar(env.into()));
+                }
+            }
+        }
+
+        if let Some(replacement) =
+            get_source_replacement(config_root.clone(), cargo_home, registry_name)?
+        {
+            return Ok(replacement);
+        }
+
+        read_cargo_config(config_root, cargo_home, |config| {
+            let path = format!("/registries/{registry_name}/index");
+            config
+                .pointer(&path)?
+                .as_str()
+                .map(|si| Self::NonCratesIo(si.to_owned().into()))
+        })?
+        .ok_or_else(|| Error::UnknownRegistry(registry_name.into()))
     }
 }
 
@@ -242,16 +302,18 @@ pub(crate) fn read_cargo_config<T>(
     Ok(None)
 }
 
-/// Gets the url of a replacement registry for crates.io if one has been configured
+/// Gets the url of a replacement registry for the specified registry if one has been configured
 ///
 /// See <https://doc.rust-lang.org/cargo/reference/source-replacement.html>
 #[inline]
-pub(crate) fn get_crates_io_replacement<'iu>(
+pub(crate) fn get_source_replacement<'iu>(
     root: Option<PathBuf>,
     cargo_home: Option<&Path>,
+    registry_name: &str,
 ) -> Result<Option<IndexUrl<'iu>>, Error> {
     read_cargo_config(root, cargo_home, |config| {
-        let repw = config.pointer("/source/crates-io/replace-with")?.as_str()?;
+        let path = format!("/source/{registry_name}/replace-with");
+        let repw = config.pointer(&path)?.as_str()?;
         let sources = config.pointer("/source")?.as_table()?;
         let replace_src = sources.get(&repw.into())?.as_table()?;
 
@@ -322,6 +384,80 @@ protocol = "git"
             let iurl = super::IndexUrl::crates_io(Some(root.clone()), None, None).unwrap();
             assert_eq!(i == 0, iurl.is_sparse());
             assert_eq!(iurl.as_str(), *url);
+        }
+    }
+
+    #[test]
+    fn custom() {
+        assert!(std::env::var_os("CARGO_REGISTRIES_TAME_INDEX_TEST_INDEX").is_none());
+
+        let td = tempfile::tempdir().unwrap();
+        let root = crate::PathBuf::from_path_buf(td.path().to_owned()).unwrap();
+        let cfg_toml = td.path().join(".cargo/config.toml");
+
+        std::fs::create_dir_all(cfg_toml.parent().unwrap()).unwrap();
+
+        const SPARSE: &str = r#"[registries.tame-index-test]
+index = "sparse+https://some-url.com"
+"#;
+
+        const GIT: &str = r#"[registries.tame-index-test]
+        index = "https://some-url.com"
+        "#;
+
+        {
+            std::fs::write(&cfg_toml, SPARSE).unwrap();
+
+            let iurl =
+                super::IndexUrl::for_registry_name(Some(root.clone()), None, "tame-index-test")
+                    .unwrap();
+            assert_eq!(iurl.as_str(), "sparse+https://some-url.com");
+            assert!(iurl.is_sparse());
+
+            std::env::set_var(
+                "CARGO_REGISTRIES_TAME_INDEX_TEST_INDEX",
+                "sparse+https://some-other-url.com",
+            );
+
+            let iurl =
+                super::IndexUrl::for_registry_name(Some(root.clone()), None, "tame-index-test")
+                    .unwrap();
+            assert_eq!(iurl.as_str(), "sparse+https://some-other-url.com");
+            assert!(iurl.is_sparse());
+
+            std::env::remove_var("CARGO_REGISTRIES_TAME_INDEX_TEST_INDEX");
+        }
+
+        {
+            std::fs::write(&cfg_toml, GIT).unwrap();
+
+            let iurl =
+                super::IndexUrl::for_registry_name(Some(root.clone()), None, "tame-index-test")
+                    .unwrap();
+            assert_eq!(iurl.as_str(), "https://some-url.com");
+            assert!(!iurl.is_sparse());
+
+            std::env::set_var(
+                "CARGO_REGISTRIES_TAME_INDEX_TEST_INDEX",
+                "https://some-other-url.com",
+            );
+
+            let iurl =
+                super::IndexUrl::for_registry_name(Some(root.clone()), None, "tame-index-test")
+                    .unwrap();
+            assert_eq!(iurl.as_str(), "https://some-other-url.com");
+            assert!(!iurl.is_sparse());
+
+            std::env::remove_var("CARGO_REGISTRIES_TAME_INDEX_TEST_INDEX");
+        }
+
+        #[allow(unused_variables)]
+        {
+            let err = crate::Error::UnknownRegistry("non-existant".to_owned());
+            assert!(matches!(
+                super::IndexUrl::for_registry_name(Some(root.clone()), None, "non-existant"),
+                Err(err),
+            ));
         }
     }
 }
