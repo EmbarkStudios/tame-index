@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.11.1] - 2024-05-03
 - [PR#61](https://github.com/EmbarkStudios/tame-index/pull/61) addressed [#60](https://github.com/EmbarkStudios/tame-index/issues/60) by adding `IndexUrl::for_registry_name` to read a registry's index url from the config/environment.
 
 ## [0.11.0] - 2024-04-23
@@ -196,7 +197,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.11.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.11.1...HEAD
+[0.11.1]: https://github.com/EmbarkStudios/tame-index/compare/0.11.0...0.11.1
 [0.11.0]: https://github.com/EmbarkStudios/tame-index/compare/0.10.0...0.11.0
 [0.10.0]: https://github.com/EmbarkStudios/tame-index/compare/0.9.9...0.10.0
 [0.9.9]: https://github.com/EmbarkStudios/tame-index/compare/0.9.8...0.9.9
