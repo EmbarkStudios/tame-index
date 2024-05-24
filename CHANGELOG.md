@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#64](https://github.com/EmbarkStudios/tame-index/pull/64) updated `gix` -> 0.63.
+
 ## [0.11.1] - 2024-05-03
 - [PR#61](https://github.com/EmbarkStudios/tame-index/pull/61) addressed [#60](https://github.com/EmbarkStudios/tame-index/issues/60) by adding `IndexUrl::for_registry_name` to read a registry's index url from the config/environment.
 
