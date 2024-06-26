@@ -315,12 +315,12 @@ pub(crate) fn get_source_replacement<'iu>(
         let path = format!("/source/{registry_name}/replace-with");
         let repw = config.pointer(&path)?.as_str()?;
         let sources = config.pointer("/source")?.as_table()?;
-        let replace_src = sources.get(&repw.into())?.as_table()?;
+        let replace_src = sources.get(repw)?.as_table()?;
 
-        if let Some(rr) = replace_src.get(&"registry".into()) {
+        if let Some(rr) = replace_src.get("registry") {
             rr.as_str()
                 .map(|r| IndexUrl::NonCratesIo(r.to_owned().into()))
-        } else if let Some(rlr) = replace_src.get(&"local-registry".into()) {
+        } else if let Some(rlr) = replace_src.get("local-registry") {
             rlr.as_str()
                 .map(|l| IndexUrl::Local(PathBuf::from(l).into()))
         } else {
