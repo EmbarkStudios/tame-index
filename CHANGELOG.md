@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.12.1] - 2024-06-26
 ### Changed
 - [PR#65](https://github.com/EmbarkStudios/tame-index/pull/65) updated `toml-span` -> 0.3.0.
 
@@ -204,7 +205,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.12.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.12.1...HEAD
+[0.12.1]: https://github.com/EmbarkStudios/tame-index/compare/0.12.0...0.12.1
 [0.12.0]: https://github.com/EmbarkStudios/tame-index/compare/0.11.1...0.12.0
 [0.11.1]: https://github.com/EmbarkStudios/tame-index/compare/0.11.0...0.11.1
 [0.11.0]: https://github.com/EmbarkStudios/tame-index/compare/0.10.0...0.11.0
