@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#65](https://github.com/EmbarkStudios/tame-index/pull/65) updated `toml-span` -> 0.3.0.
+
 ## [0.12.0] - 2024-05-24
 ### Changed
 - [PR#64](https://github.com/EmbarkStudios/tame-index/pull/64) updated `gix` -> 0.63.
