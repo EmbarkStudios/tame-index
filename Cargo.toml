@@ -12,7 +12,12 @@ repository = "https://github.com/EmbarkStudios/tame-index"
 [features]
 default = ["reqwest?/rustls-tls-webpki-roots"]
 # Enables the built-in support for fetching and reading a git registry index
-git = ["dep:gix", "dep:reqwest"]
+git = ["gix-reqwest"]
+# The default is reqwest since that doesn't pull in (a ton of) C code
+gix-reqwest = ["gix/blocking-http-transport-reqwest", "dep:reqwest"]
+# Unfortunately need to support curl as well, though we don't test or care about it, in addition
+# to having 2 HTTP client implementations if sparse is also enabled
+gix-curl = ["gix/blocking-http-transport-curl"]
 # Enables the built-in support for requesting index entries from a HTTP sparse registry index
 sparse = ["dep:reqwest", "dep:tokio", "dep:rayon", "dep:crossbeam-channel"]
 # Enables local registry support
