@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.12.2] - 2024-07-22
 ### Added
 - [PR#66](https://github.com/EmbarkStudios/tame-index/pull/66) added the `gix-curl` feature, which is mutually exclusive with the `git` and `gix-reqwest` features.
 
@@ -208,7 +209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.12.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.12.2...HEAD
+[0.12.2]: https://github.com/EmbarkStudios/tame-index/compare/0.12.1...0.12.2
 [0.12.1]: https://github.com/EmbarkStudios/tame-index/compare/0.12.0...0.12.1
 [0.12.0]: https://github.com/EmbarkStudios/tame-index/compare/0.11.1...0.12.0
 [0.11.1]: https://github.com/EmbarkStudios/tame-index/compare/0.11.0...0.11.1
