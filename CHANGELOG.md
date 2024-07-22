@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#66](https://github.com/EmbarkStudios/tame-index/pull/66) added the `gix-curl` feature, which is mutually exclusive with the `git` and `gix-reqwest` features.
+
 ## [0.12.1] - 2024-06-26
 ### Changed
 - [PR#65](https://github.com/EmbarkStudios/tame-index/pull/65) updated `toml-span` -> 0.3.0.

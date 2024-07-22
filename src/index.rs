@@ -2,11 +2,11 @@
 //! indices
 
 pub mod cache;
-#[cfg(all(feature = "git", feature = "sparse"))]
+#[cfg(all(feature = "__git", feature = "sparse"))]
 mod combo;
 #[allow(missing_docs)]
 pub mod git;
-#[cfg(feature = "git")]
+#[cfg(feature = "__git")]
 pub(crate) mod git_remote;
 #[cfg(feature = "local")]
 pub mod local;
@@ -17,10 +17,10 @@ pub mod sparse;
 mod sparse_remote;
 
 pub use cache::IndexCache;
-#[cfg(all(feature = "git", feature = "sparse"))]
+#[cfg(all(feature = "__git", feature = "sparse"))]
 pub use combo::ComboIndex;
 pub use git::GitIndex;
-#[cfg(feature = "git")]
+#[cfg(feature = "__git")]
 pub use git_remote::RemoteGitIndex;
 #[cfg(feature = "local")]
 pub use local::LocalRegistry;

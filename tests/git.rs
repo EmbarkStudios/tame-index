@@ -1,4 +1,4 @@
-#![cfg(feature = "git")]
+#![cfg(feature = "__git")]
 
 mod utils;
 use tame_index::{

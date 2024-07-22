@@ -1,6 +1,6 @@
 //! Provides the various error types for this crate
 
-#[cfg(feature = "git")]
+#[cfg(feature = "__git")]
 pub use crate::index::git_remote::GitError;
 #[cfg(feature = "local")]
 pub use crate::index::local::LocalRegistryError;
@@ -47,7 +47,7 @@ pub enum Error {
     #[error(transparent)]
     Http(#[from] HttpError),
     /// An error occurred doing a git operation
-    #[cfg(feature = "git")]
+    #[cfg(feature = "__git")]
     #[error(transparent)]
     Git(#[from] GitError),
     /// Failed to parse a semver version or requirement
