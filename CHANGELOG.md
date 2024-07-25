@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#67](https://github.com/EmbarkStudios/tame-index/pull/67) updated `gix` -> 0.64.
+
 ## [0.12.2] - 2024-07-22
 ### Added
 - [PR#66](https://github.com/EmbarkStudios/tame-index/pull/66) added the `gix-curl` feature, which is mutually exclusive with the `git` and `gix-reqwest` features.
