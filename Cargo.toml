@@ -29,6 +29,8 @@ local-builder = ["local", "dep:reqwest"]
 # Enables the use of OS native certificate store.
 # Should be used with `default-features = false` to also disable webpki-roots, which is activated by default.
 native-certs = ["reqwest?/rustls-tls-native-roots"]
+# We can't use all-features because of gix-curl, so this is just an alias for my sanity
+__internal_all = ["git", "sparse", "local-builder"]
 
 [dependencies]
 bytes = { version = "1.4", optional = true }

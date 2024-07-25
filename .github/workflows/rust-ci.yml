@@ -26,7 +26,7 @@ jobs:
       - run: cargo fetch
       - name: cargo clippy
         # Unfortunately we can't use --all-features since that would enable request and curl for gix which is not allowed
-        run: cargo clippy --all-targets --features git,sparse,local-builder -- -D warnings
+        run: cargo clippy --all-targets --features __internal_all -- -D warnings
       - name: sigh
         run: cargo clippy --all-targets --features gix-curl,sparse,local-builder -- -D warnings
 
