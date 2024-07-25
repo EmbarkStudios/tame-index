@@ -147,7 +147,7 @@ impl TreeUpdateBuilder {
 ///
 /// 1. Using the crates.io git registry. It's massive and slow.
 /// 2. Using some other external git registry, could fail for any number of
-/// network etc related issues
+///     network etc related issues
 /// 3. Needing to maintain a blessed remote of any kind
 struct FakeRemote {
     repo: gix::Repository,
@@ -166,7 +166,7 @@ impl FakeRemote {
         // Create an empty initial commit so we always have _something_
         let parent = {
             let empty_tree_id = repo
-                .write_object(&gix::objs::Tree::empty())
+                .write_object(gix::objs::Tree::empty())
                 .unwrap()
                 .detach();
 
@@ -481,7 +481,7 @@ fn non_main_local_branch() {
         let commit = {
             let snap = FakeRemote::snapshot(&mut repo);
             let empty_tree_id = snap
-                .write_object(&gix::objs::Tree::empty())
+                .write_object(gix::objs::Tree::empty())
                 .unwrap()
                 .detach();
 
