@@ -352,12 +352,12 @@ impl RemoteGitIndex {
 
         let mut config = self.repo.config_snapshot_mut();
         config
-            .set_raw_value("committer", None, "name", "tame-index")
+            .set_raw_value(&"committer.name", "tame-index")
             .map_err(GitError::from)?;
         // Note we _have_ to set the email as well, but luckily gix does not actually
         // validate if it's a proper email or not :)
         config
-            .set_raw_value("committer", None, "email", "")
+            .set_raw_value(&"committer.email", "")
             .map_err(GitError::from)?;
 
         let repo = config
