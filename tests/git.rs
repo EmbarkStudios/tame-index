@@ -193,22 +193,20 @@ impl FakeRemote {
     fn snapshot(repo: &mut gix::Repository) -> gix::config::CommitAutoRollback<'_> {
         let mut config = repo.config_snapshot_mut();
         config
-            .set_raw_value("author", None, "name", "Integration Test")
+            .set_raw_value(&"author.name", "Integration Test")
             .unwrap();
         config
-            .set_raw_value("committer", None, "name", "Integration Test")
+            .set_raw_value(&"committer.name", "Integration Test")
             .unwrap();
         config
-            .set_raw_value("author", None, "email", "tests@integration.se")
+            .set_raw_value(&"author.email", "tests@integration.se")
             .unwrap();
         config
-            .set_raw_value("committer", None, "email", "tests@integration.se")
+            .set_raw_value(&"committer.email", "tests@integration.se")
             .unwrap();
 
         // Disable GPG signing, it breaks testing if the user has it enabled
-        config
-            .set_raw_value("commit", None, "gpgsign", "false")
-            .unwrap();
+        config.set_raw_value(&"commit.gpgsign", "false").unwrap();
 
         config.commit_auto_rollback().unwrap()
     }
