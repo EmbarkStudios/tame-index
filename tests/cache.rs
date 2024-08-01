@@ -1,3 +1,11 @@
+#![cfg(target_pointer_width = "64")]
+
+//! Note we only run these tests if _built_ for 64-bit, as the only test targets
+//! this project cares about are 64 bit, and the issue is that, to match cargo
+//! we need to calculate the hash of the index the same, the rub is that when
+//! running a 32-bit target (eg. i686) on a 64-bit host where the cargo on the
+//! host is built for the 64-bit target as well, the local directories won't match
+
 mod utils;
 
 use tame_index::{index::cache::ValidCacheEntry, utils::get_index_details, IndexCache};

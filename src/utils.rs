@@ -104,9 +104,16 @@ pub fn canonicalize_url(url: &str) -> Result<String, Error> {
 pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
     use std::hash::{Hash, Hasher, SipHasher};
 
-    const GIT_REPO: u64 = 0;
-    const GIT_REGISTRY: u64 = 2;
-    const SPARSE_REGISTRY: u64 = 3;
+    // This is extremely irritating, but we need to use usize for the kind, which
+    // impacts the hash calculation, making it different based on pointer size.
+    //
+    // The reason for this is that cargo just uses #[derive(Hash)] for the SourceKind
+    // https://github.com/rust-lang/cargo/blob/88b4b3bcd3bbb66873734d97ae412a6bcf9b75ee/crates/cargo-util-schemas/src/core/source_kind.rs#L4-L5,
+    // which then uses https://doc.rust-lang.org/core/intrinsics/fn.discriminant_value.html
+    // to get the discriminant and add to the hash...and that is pointer width :(
+    const GIT_REPO: usize = 0;
+    const GIT_REGISTRY: usize = 2;
+    const SPARSE_REGISTRY: usize = 3;
 
     // Ensure we have a registry or bare url
     let (url, scheme_ind, kind) = {
@@ -272,7 +279,7 @@ mod test {
     use crate::PathBuf;
 
     #[test]
-    #[cfg(target_endian = "little")]
+    #[cfg(all(target_pointer_width = "64", target_endian = "little"))]
     fn canonicalizes_git_urls() {
         let super::UrlDir { dir_name, canonical } = url_to_local_dir("git+https://github.com/EmbarkStudios/cpal.git?rev=d59b4de#d59b4decf72a96932a1482cc27fe4c0b50c40d32").unwrap();
 
@@ -322,7 +329,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(target_endian = "little")]
+    #[cfg(all(target_pointer_width = "64", target_endian = "little"))]
     fn matches_cargo() {
         assert_eq!(
             get_index_details(crate::CRATES_IO_INDEX, Some(PathBuf::new())).unwrap(),
@@ -366,6 +373,18 @@ mod test {
         assert_eq!(
             url_to_local_dir(FAKE_REGISTRY).unwrap().dir_name,
             "github.com-a946fc29ac602819"
+        );
+    }
+
+    #[test]
+    #[cfg(all(target_pointer_width = "32", target_endian = "little"))]
+    fn matches_cargo_32bit() {
+        assert_eq!(
+            get_index_details(crate::CRATES_IO_HTTP_INDEX, Some(PathBuf::new())).unwrap(),
+            (
+                "registry/index/index.crates.io-1cd66030c949c28d".into(),
+                crate::CRATES_IO_HTTP_INDEX.to_owned(),
+            )
         );
     }
 
