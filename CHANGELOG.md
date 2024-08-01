@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#69](https://github.com/EmbarkStudios/tame-index/pull/69) resolved an issue where 32-bit targets would have a different ident hash from what cargo would have due to cargo being target dependent in the hash calculation.
+
 ## [0.13.0] - 2024-07-25
 ### Changed
 - [PR#67](https://github.com/EmbarkStudios/tame-index/pull/67) updated `gix` -> 0.64.
