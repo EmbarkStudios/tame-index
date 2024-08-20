@@ -89,7 +89,7 @@ tempfile = "3.6"
 tiny-bench = "0.3"
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["__internal_all"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev.package.sha2]
