@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.13.2] - 2024-08-20
 ### Fixed
 - [PR#71](https://github.com/EmbarkStudios/tame-index/pull/71) resolved [#70](https://github.com/EmbarkStudios/tame-index/issues/70) by using the correct feature flag for docs.rs.
 
@@ -223,7 +224,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.13.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.13.2...HEAD
+[0.13.2]: https://github.com/EmbarkStudios/tame-index/compare/0.13.1...0.13.2
 [0.13.1]: https://github.com/EmbarkStudios/tame-index/compare/0.13.0...0.13.1
 [0.13.0]: https://github.com/EmbarkStudios/tame-index/compare/0.12.2...0.13.0
 [0.12.2]: https://github.com/EmbarkStudios/tame-index/compare/0.12.1...0.12.2
