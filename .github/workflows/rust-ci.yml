@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v1
+      - uses: EmbarkStudios/cargo-deny-action@v2
 
   publish-check:
     name: Publish Check
@@ -68,3 +68,10 @@ jobs:
       - run: cargo fetch
       - name: cargo publish check
         run: cargo publish --dry-run
+
+  test_success:
+    runs-on: ubuntu-22.04
+    needs: [lint, test, publish-check, deny-check]
+    steps:
+      - run: echo "All test jobs passed"
+      
