@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#71](https://github.com/EmbarkStudios/tame-index/pull/71) resolved [#70](https://github.com/EmbarkStudios/tame-index/issues/70) by using the correct feature flag for docs.rs.
+
+### Changed
+- [PR#72](https://github.com/EmbarkStudios/tame-index/pull/72) updated crates.
+
 ## [0.13.1] - 2024-08-01
 ### Fixed
 - [PR#69](https://github.com/EmbarkStudios/tame-index/pull/69) resolved an issue where 32-bit targets would have a different ident hash from what cargo would have due to cargo being target dependent in the hash calculation.
