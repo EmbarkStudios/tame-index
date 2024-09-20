@@ -54,10 +54,10 @@ sha2 = { version = "0.10", optional = true, default-features = false, features =
     "std",
 ] }
 # Smaller fixed size strings with heap fallback
-smol_str = { version = "0.2.0", features = ["serde"] }
+smol_str = { version = "0.3", features = ["serde"] }
 # Laziness
 thiserror = "1.0"
-tokio = { version = "1.39", default-features = false, features = [
+tokio = { version = "1.40", default-features = false, features = [
     "rt-multi-thread",
     "time",
 ], optional = true }
@@ -68,7 +68,7 @@ twox-hash = { version = "1.6", default-features = false }
 
 [dependencies.gix]
 optional = true
-version = "0.64"
+version = "0.66"
 default-features = false
 features = []
 
@@ -86,7 +86,7 @@ libc = "0.2"
 cargo_metadata = "0.18"
 rayon = "1.7"
 tempfile = "3.12"
-tiny-bench = "0.3"
+tiny-bench = "0.4"
 
 [package.metadata.docs.rs]
 features = ["__internal_all"]
