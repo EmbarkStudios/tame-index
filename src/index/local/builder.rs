@@ -28,10 +28,7 @@ impl<'iv> super::ValidKrate<'iv> {
         config: &crate::index::IndexConfig,
         version: &'iv crate::IndexVersion,
     ) -> Result<Self, Error> {
-        let url = config.download_url(
-            version.name.as_str().try_into()?,
-            &version.version.to_string(),
-        );
+        let url = config.download_url(version.name.as_str().try_into()?, version.version.as_ref());
 
         let res = client.inner.get(url).send()?.error_for_status()?;
         let body = res.bytes()?;

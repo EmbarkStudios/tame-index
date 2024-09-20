@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#73](https://github.com/EmbarkStudios/tame-index/pull/73) updated `gix` -> 0.66.
+
 ## [0.13.2] - 2024-08-20
 ### Fixed
 - [PR#71](https://github.com/EmbarkStudios/tame-index/pull/71) resolved [#70](https://github.com/EmbarkStudios/tame-index/issues/70) by using the correct feature flag for docs.rs.

@@ -505,7 +505,7 @@ fn non_main_local_branch() {
                         message: "".into(),
                     },
                     expected: tx::PreviousValue::Any,
-                    new: gix::refs::Target::Peeled(commit),
+                    new: gix::refs::Target::Object(commit),
                 },
                 name: "refs/heads/master".try_into().unwrap(),
                 deref: false,
