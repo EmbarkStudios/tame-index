@@ -124,10 +124,7 @@ impl IndexVersion {
     /// Retrieves the URL this crate version's tarball can be downloaded from
     #[inline]
     pub fn download_url(&self, index: &crate::index::IndexConfig) -> Option<String> {
-        Some(index.download_url(
-            self.name.as_str().try_into().ok()?,
-            &self.version.to_string(),
-        ))
+        Some(index.download_url(self.name.as_str().try_into().ok()?, self.version.as_ref()))
     }
 }
 
