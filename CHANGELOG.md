@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#74](https://github.com/EmbarkStudios/tame-index/pull/74) updated `gix` -> 0.67.
+
+### Fixed
+- [PR#74](https://github.com/EmbarkStudios/tame-index/pull/74) fixed a bug where the list of reserved crate names was not sorted correctly for binary searching.
+
 ## [0.14.0] - 2024-09-20
 ### Changed
 - [PR#73](https://github.com/EmbarkStudios/tame-index/pull/73) updated `gix` -> 0.66.

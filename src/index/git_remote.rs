@@ -257,9 +257,8 @@ impl RemoteGitIndex {
             .try_into_commit()?
             .tree()?;
 
-        let mut buf = Vec::new();
         let Some(entry) = tree
-            .lookup_entry_by_path(path, &mut buf)
+            .lookup_entry_by_path(path)
             .map_err(|err| GitError::BlobLookup(Box::new(err)))?
         else {
             return Ok(None);
