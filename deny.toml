@@ -20,6 +20,7 @@ allow = [
     "MPL-2.0",
     "ISC",
     "BSD-3-Clause",
+    "Unicode-3.0",
 ]
 exceptions = [
     { allow = [
@@ -43,6 +44,7 @@ deny = [
     #"curl", 
 ]
 skip = [
+    { crate = "hashbrown@0.14.5", reason = "gix uses this old version" },
 ]
 skip-tree = [
     # sigh
