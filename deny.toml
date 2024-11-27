@@ -24,9 +24,6 @@ allow = [
 ]
 exceptions = [
     { allow = [
-        "Unicode-DFS-2016",
-    ], name = "unicode-ident" },
-    { allow = [
         "OpenSSL",
     ], name = "ring" },
 ]
