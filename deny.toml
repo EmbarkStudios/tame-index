@@ -42,6 +42,7 @@ deny = [
 ]
 skip = [
     { crate = "hashbrown@0.14.5", reason = "gix uses this old version" },
+    { crate = "core-foundation@0.9.4", reason = "system-configuration uses this old version" },
 ]
 skip-tree = [
     # sigh
