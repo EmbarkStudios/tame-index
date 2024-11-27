@@ -24,9 +24,6 @@ allow = [
 ]
 exceptions = [
     { allow = [
-        "Unicode-DFS-2016",
-    ], name = "unicode-ident" },
-    { allow = [
         "OpenSSL",
     ], name = "ring" },
 ]
@@ -45,10 +42,12 @@ deny = [
 ]
 skip = [
     { crate = "hashbrown@0.14.5", reason = "gix uses this old version" },
+    { crate = "core-foundation@0.9.4", reason = "system-configuration uses this old version" },
 ]
 skip-tree = [
     # sigh
     "windows-sys@0.52.0",
+    { crate = "thiserror@1.0.69", reason = "gix depends on both the 1.0 and 2.0 versions" },
 ]
 
 [sources]
