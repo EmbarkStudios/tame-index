@@ -38,7 +38,7 @@ pub fn write_fetch_head(
         .mappings
         .iter()
         .find_map(|mapping| {
-            let gix::remote::fetch::Source::Ref(rref) = &mapping.remote else {
+            let gix::remote::fetch::refmap::Source::Ref(rref) = &mapping.remote else {
                 return None;
             };
 
