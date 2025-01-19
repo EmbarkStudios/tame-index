@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#75](https://github.com/EmbarkStudios/tame-index/pull/78) updated `gix` -> 0.70.
+- [PR#80](https://github.com/EmbarkStudios/tame-index/pull/80) updated dependencies.
+
 ## [0.16.0] - 2024-11-28
 ### Changed
 - [PR#75](https://github.com/EmbarkStudios/tame-index/pull/75) updated `gix` -> 0.68.

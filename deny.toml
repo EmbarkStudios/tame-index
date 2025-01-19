@@ -47,7 +47,6 @@ skip = [
 skip-tree = [
     # sigh
     "windows-sys@0.52.0",
-    { crate = "thiserror@1.0.69", reason = "gix depends on both the 1.0 and 2.0 versions" },
 ]
 
 [sources]
