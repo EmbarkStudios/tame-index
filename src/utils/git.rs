@@ -38,7 +38,7 @@ pub fn write_fetch_head(
         .mappings
         .iter()
         .find_map(|mapping| {
-            let gix::remote::fetch::Source::Ref(rref) = &mapping.remote else {
+            let gix::remote::fetch::refmap::Source::Ref(rref) = &mapping.remote else {
                 return None;
             };
 
@@ -93,13 +93,10 @@ pub fn write_fetch_head(
                 }
 
                 rspec.local().map_or(false, |l| {
-                    l.to_str()
-                        .ok()
-                        .and_then(|l| {
-                            l.strip_prefix("refs/remotes/")
-                                .and_then(|l| l.strip_suffix("/HEAD"))
-                        })
-                        .map_or(false, |remote| remote == remote_name)
+                    l.to_str().ok().and_then(|l| {
+                        l.strip_prefix("refs/remotes/")
+                            .and_then(|l| l.strip_suffix("/HEAD"))
+                    }) == Some(remote_name)
                 })
             })
         {
