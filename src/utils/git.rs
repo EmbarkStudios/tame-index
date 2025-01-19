@@ -93,13 +93,10 @@ pub fn write_fetch_head(
                 }
 
                 rspec.local().map_or(false, |l| {
-                    l.to_str()
-                        .ok()
-                        .and_then(|l| {
-                            l.strip_prefix("refs/remotes/")
-                                .and_then(|l| l.strip_suffix("/HEAD"))
-                        })
-                        .map_or(false, |remote| remote == remote_name)
+                    l.to_str().ok().and_then(|l| {
+                        l.strip_prefix("refs/remotes/")
+                            .and_then(|l| l.strip_suffix("/HEAD"))
+                    }) == Some(remote_name)
                 })
             })
         {
