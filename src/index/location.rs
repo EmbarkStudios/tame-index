@@ -204,6 +204,10 @@ pub struct IndexLocation<'il> {
     pub url: IndexUrl<'il>,
     /// The local disk path of the index
     pub root: IndexPath,
+    /// The index location depends on the version of cargo used, as 1.85.0
+    /// introduced a change to how the url is hashed. Not specifying the version
+    /// will acquire the cargo version pertaining to the current environment.
+    pub cargo_version: Option<&'il str>,
 }
 
 impl<'il> IndexLocation<'il> {
@@ -213,6 +217,7 @@ impl<'il> IndexLocation<'il> {
         Self {
             url,
             root: IndexPath::CargoHome,
+            cargo_version: None,
         }
     }
 
@@ -235,7 +240,14 @@ impl<'il> IndexLocation<'il> {
             IndexPath::Exact(path) => return Ok((path, url.to_owned())),
         };
 
-        let (path, mut url) = crate::utils::get_index_details(url, Some(root))?;
+        let vers = match self.cargo_version {
+            Some(v) => v.trim().parse()?,
+            None => crate::utils::cargo_version(None)?,
+        };
+
+        let stable = vers >= semver::Version::new(1, 85, 0);
+
+        let (path, mut url) = crate::utils::get_index_details(url, Some(root), stable)?;
 
         if !url.ends_with('/') {
             url.push('/');

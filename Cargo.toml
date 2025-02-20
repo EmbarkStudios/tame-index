@@ -45,6 +45,8 @@ http = "1.2"
 # Nicer scanning through bytes
 memchr = "2.5"
 rayon = { version = "1.7", optional = true }
+# Contains hasher used by cargo 1.85.0+
+rustc-stable-hash = "0.1"
 # Nicer versions for users
 semver = { version = "1.0", features = ["serde"] }
 # Serialization
