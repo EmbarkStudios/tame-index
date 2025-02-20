@@ -14,6 +14,7 @@ fn remote_index(
         GitIndex::new(IndexLocation {
             url: IndexUrl::NonCratesIo(url.as_ref().as_str().into()),
             root: IndexPath::Exact(path.as_ref().join("sub/dir")),
+            cargo_version: None,
         })
         .unwrap(),
         &utils::unlocked(),

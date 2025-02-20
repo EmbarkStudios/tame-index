@@ -101,7 +101,7 @@ pub fn canonicalize_url(url: &str) -> Result<String, Error> {
 /// * `sparse+<sparse registry url>`
 /// * `git+<git repo url>`
 #[allow(deprecated)]
-pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
+pub fn url_to_local_dir(url: &str, stable: bool) -> Result<UrlDir, Error> {
     use std::hash::{Hash, Hasher, SipHasher};
 
     // This is extremely irritating, but we need to use usize for the kind, which
@@ -111,9 +111,19 @@ pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
     // https://github.com/rust-lang/cargo/blob/88b4b3bcd3bbb66873734d97ae412a6bcf9b75ee/crates/cargo-util-schemas/src/core/source_kind.rs#L4-L5,
     // which then uses https://doc.rust-lang.org/core/intrinsics/fn.discriminant_value.html
     // to get the discriminant and add to the hash...and that is pointer width :(
-    const GIT_REPO: usize = 0;
-    const GIT_REGISTRY: usize = 2;
-    const SPARSE_REGISTRY: usize = 3;
+    //
+    // Note that these are isize instead of usize because contrary to what one
+    // would expect from the automatic discriminant assigned by rustc starting
+    // at 0 and incrementing by 1 each time...it's actually signed, which can
+    // be seen by overriding `Hasher::write_isize` and hashing a discriminant
+    //
+    // This is unfortunately a hard requirement because of https://github.com/rust-lang/rustc-stable-hash/blob/24e9848c89917abca155c8f854118e6d00ad4a30/src/stable_hasher.rs#L263-L299
+    // where it specializes _only_ isize to only write a u8 if the value is less
+    // than 0xff, something that doesn't happen for usize, which of course affects
+    // the calculated hash
+    const GIT_REPO: isize = 0;
+    const GIT_REGISTRY: isize = 2;
+    const SPARSE_REGISTRY: isize = 3;
 
     // Ensure we have a registry or bare url
     let (url, scheme_ind, kind) = {
@@ -162,8 +172,12 @@ pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
             .unwrap_or("_empty")
             .to_owned();
 
-        let hash = {
-            let mut hasher = SipHasher::new_with_keys(0, 0);
+        let hash = if stable {
+            let mut hasher = rustc_stable_hash::StableSipHasher128::new();
+            canonical.hash(&mut hasher);
+            Hasher::finish(&hasher)
+        } else {
+            let mut hasher = SipHasher::new();
             canonical.hash(&mut hasher);
             hasher.finish()
         };
@@ -175,8 +189,13 @@ pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
 
         (dir_name, canonical)
     } else {
-        let hash = {
-            let mut hasher = SipHasher::new_with_keys(0, 0);
+        let hash = if stable {
+            let mut hasher = rustc_stable_hash::StableSipHasher128::new();
+            kind.hash(&mut hasher);
+            url.hash(&mut hasher);
+            Hasher::finish(&hasher)
+        } else {
+            let mut hasher = SipHasher::new();
             kind.hash(&mut hasher);
             url.hash(&mut hasher);
             hasher.finish()
@@ -207,8 +226,12 @@ pub fn url_to_local_dir(url: &str) -> Result<UrlDir, Error> {
 /// Get the disk location of the specified url, as well as its canonical form
 ///
 /// If not specified, the root directory is the user's default cargo home
-pub fn get_index_details(url: &str, root: Option<PathBuf>) -> Result<(PathBuf, String), Error> {
-    let url_dir = url_to_local_dir(url)?;
+pub fn get_index_details(
+    url: &str,
+    root: Option<PathBuf>,
+    stable: bool,
+) -> Result<(PathBuf, String), Error> {
+    let url_dir = url_to_local_dir(url, stable)?;
 
     let mut path = match root {
         Some(path) => path,
@@ -243,7 +266,7 @@ fn parse_cargo_semver(s: &str) -> Result<semver::Version, Error> {
 }
 
 /// Retrieves the current version of cargo being used
-pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<semver::Version, Error> {
+pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<crate::Version, Error> {
     let mut cargo = std::process::Command::new(
         std::env::var_os("CARGO")
             .as_deref()
@@ -281,7 +304,7 @@ mod test {
     #[test]
     #[cfg(all(target_pointer_width = "64", target_endian = "little"))]
     fn canonicalizes_git_urls() {
-        let super::UrlDir { dir_name, canonical } = url_to_local_dir("git+https://github.com/EmbarkStudios/cpal.git?rev=d59b4de#d59b4decf72a96932a1482cc27fe4c0b50c40d32").unwrap();
+        let super::UrlDir { dir_name, canonical } = url_to_local_dir("git+https://github.com/EmbarkStudios/cpal.git?rev=d59b4de#d59b4decf72a96932a1482cc27fe4c0b50c40d32", false).unwrap();
 
         assert_eq!("https://github.com/embarkstudios/cpal", canonical);
         assert_eq!("cpal-a7ffd7cabefac714", dir_name);
@@ -289,7 +312,7 @@ mod test {
         let super::UrlDir {
             dir_name,
             canonical,
-        } = url_to_local_dir("git+https://github.com/gfx-rs/genmesh?rev=71abe4d").unwrap();
+        } = url_to_local_dir("git+https://github.com/gfx-rs/genmesh?rev=71abe4d", false).unwrap();
 
         assert_eq!("https://github.com/gfx-rs/genmesh", canonical);
         assert_eq!("genmesh-401fe503e87439cc", dir_name);
@@ -301,7 +324,11 @@ mod test {
         let super::UrlDir {
             dir_name,
             canonical,
-        } = url_to_local_dir("registry+https://github.com/Rust-Lang/crates.io-index").unwrap();
+        } = url_to_local_dir(
+            "registry+https://github.com/Rust-Lang/crates.io-index",
+            false,
+        )
+        .unwrap();
 
         assert_eq!("https://github.com/Rust-Lang/crates.io-index", canonical);
         assert_eq!("github.com-016fae53232cc64d", dir_name);
@@ -311,7 +338,11 @@ mod test {
         let super::UrlDir {
             dir_name,
             canonical,
-        } = url_to_local_dir("git+https://gitlab.com/gilrs-project/gilrs.git?rev=1bbec17").unwrap();
+        } = url_to_local_dir(
+            "git+https://gitlab.com/gilrs-project/gilrs.git?rev=1bbec17",
+            false,
+        )
+        .unwrap();
 
         assert_eq!("https://gitlab.com/gilrs-project/gilrs", canonical);
         assert_eq!("gilrs-7804d1d6a17891c9", dir_name);
@@ -319,7 +350,7 @@ mod test {
         let super::UrlDir {
             dir_name,
             canonical,
-        } = url_to_local_dir("ssh://git@github.com/rust-lang/crates.io-index.git").unwrap();
+        } = url_to_local_dir("ssh://git@github.com/rust-lang/crates.io-index.git", false).unwrap();
 
         assert_eq!(
             "ssh://git@github.com/rust-lang/crates.io-index.git",
@@ -332,7 +363,7 @@ mod test {
     #[cfg(all(target_pointer_width = "64", target_endian = "little"))]
     fn matches_cargo() {
         assert_eq!(
-            get_index_details(crate::CRATES_IO_INDEX, Some(PathBuf::new())).unwrap(),
+            get_index_details(crate::CRATES_IO_INDEX, Some(PathBuf::new()), false).unwrap(),
             (
                 "registry/index/github.com-1ecc6299db9ec823".into(),
                 crate::CRATES_IO_INDEX.to_owned()
@@ -340,7 +371,7 @@ mod test {
         );
 
         assert_eq!(
-            get_index_details(crate::CRATES_IO_HTTP_INDEX, Some(PathBuf::new())).unwrap(),
+            get_index_details(crate::CRATES_IO_HTTP_INDEX, Some(PathBuf::new()), false).unwrap(),
             (
                 "registry/index/index.crates.io-6f17d22bba15001f".into(),
                 crate::CRATES_IO_HTTP_INDEX.to_owned(),
@@ -349,7 +380,7 @@ mod test {
 
         const NON_CRATES_IO_GITHUB: &str = "https://github.com/EmbarkStudios/cargo-test-index";
         assert_eq!(
-            get_index_details(NON_CRATES_IO_GITHUB, Some(PathBuf::new())).unwrap(),
+            get_index_details(NON_CRATES_IO_GITHUB, Some(PathBuf::new()), false).unwrap(),
             (
                 "registry/index/github.com-655148e0a865c9e0".into(),
                 NON_CRATES_IO_GITHUB.to_owned(),
@@ -359,7 +390,7 @@ mod test {
         const NON_GITHUB_INDEX: &str =
             "https://dl.cloudsmith.io/public/embark/deny/cargo/index.git";
         assert_eq!(
-            get_index_details(NON_GITHUB_INDEX, Some(PathBuf::new())).unwrap(),
+            get_index_details(NON_GITHUB_INDEX, Some(PathBuf::new()), false).unwrap(),
             (
                 "registry/index/dl.cloudsmith.io-955e041deb7d37e6".into(),
                 NON_GITHUB_INDEX.to_owned(),
@@ -371,8 +402,19 @@ mod test {
         const FAKE_REGISTRY: &str = "https://github.com/RustSec/advisory-db";
 
         assert_eq!(
-            url_to_local_dir(FAKE_REGISTRY).unwrap().dir_name,
+            url_to_local_dir(FAKE_REGISTRY, false).unwrap().dir_name,
             "github.com-a946fc29ac602819"
+        );
+    }
+
+    #[test]
+    fn matches_cargo_1850() {
+        assert_eq!(
+            get_index_details(crate::CRATES_IO_HTTP_INDEX, Some(PathBuf::new()), true).unwrap(),
+            (
+                "registry/index/index.crates.io-1949cf8c6b5b557f".into(),
+                crate::CRATES_IO_HTTP_INDEX.to_owned(),
+            )
         );
     }
 
@@ -380,7 +422,7 @@ mod test {
     #[cfg(all(target_pointer_width = "32", target_endian = "little"))]
     fn matches_cargo_32bit() {
         assert_eq!(
-            get_index_details(crate::CRATES_IO_HTTP_INDEX, Some(PathBuf::new())).unwrap(),
+            get_index_details(crate::CRATES_IO_HTTP_INDEX, Some(PathBuf::new()), false).unwrap(),
             (
                 "registry/index/index.crates.io-1cd66030c949c28d".into(),
                 crate::CRATES_IO_HTTP_INDEX.to_owned(),
