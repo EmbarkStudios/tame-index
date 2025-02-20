@@ -33,7 +33,7 @@ native-certs = ["reqwest?/rustls-tls-native-roots"]
 __internal_all = ["git", "sparse", "local-builder"]
 
 [dependencies]
-bytes = { version = "1.9", optional = true }
+bytes = { version = "1.10", optional = true }
 # All paths are assumed to be utf-8 for ease of use and implementation
 camino = "1.1"
 # Better channels, already a dep if rayon is pulled in
