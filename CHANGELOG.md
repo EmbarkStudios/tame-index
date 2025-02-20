@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#82](https://github.com/EmbarkStudios/tame-index/pull/82) resolved [#81](https://github.com/EmbarkStudios/tame-index/issues/81), updating the hash calculation to match cargo 1.85.0. The decision of the hash calculation is based on the cargo version, which can be specified by the user via `IndexLocation::cargo_version`, defaulting to retrieving the version from the current environment if not specified allowing the calculation to work regardless of which cargo version is used.
+- [PR#82](https://github.com/EmbarkStudios/tame-index/pull/82) added a re-export of `semver::Version`.
+
 ## [0.17.0] - 2025-01-19
 ### Changed
 - [PR#75](https://github.com/EmbarkStudios/tame-index/pull/78) updated `gix` -> 0.70.
