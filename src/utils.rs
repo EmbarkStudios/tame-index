@@ -266,7 +266,7 @@ fn parse_cargo_semver(s: &str) -> Result<semver::Version, Error> {
 }
 
 /// Retrieves the current version of cargo being used
-pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<semver::Version, Error> {
+pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<crate::Version, Error> {
     let mut cargo = std::process::Command::new(
         std::env::var_os("CARGO")
             .as_deref()

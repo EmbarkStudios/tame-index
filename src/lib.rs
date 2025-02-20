@@ -16,6 +16,7 @@ pub use index::{
 };
 pub use krate::{IndexDependency, IndexKrate, IndexVersion};
 pub use krate_name::KrateName;
+pub use semver::Version;
 
 /// Reexports of some crates for easier downstream usage without requiring adding
 /// your own dependencies

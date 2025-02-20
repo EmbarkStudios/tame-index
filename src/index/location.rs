@@ -207,7 +207,7 @@ pub struct IndexLocation<'il> {
     /// The index location depends on the version of cargo used, as 1.85.0
     /// introduced a change to how the url is hashed. Not specifying the version
     /// will acquire the cargo version pertaining to the current environment.
-    pub cargo_version: Option<&'il str>,
+    pub cargo_version: Option<crate::Version>,
 }
 
 impl<'il> IndexLocation<'il> {
@@ -240,9 +240,10 @@ impl<'il> IndexLocation<'il> {
             IndexPath::Exact(path) => return Ok((path, url.to_owned())),
         };
 
-        let vers = match self.cargo_version {
-            Some(v) => v.trim().parse()?,
-            None => crate::utils::cargo_version(None)?,
+        let vers = if let Some(v) = self.cargo_version {
+            v
+        } else {
+            crate::utils::cargo_version(None)?
         };
 
         let stable = vers >= semver::Version::new(1, 85, 0);
