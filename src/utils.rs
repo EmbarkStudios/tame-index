@@ -226,7 +226,11 @@ pub fn url_to_local_dir(url: &str, stable: bool) -> Result<UrlDir, Error> {
 /// Get the disk location of the specified url, as well as its canonical form
 ///
 /// If not specified, the root directory is the user's default cargo home
-pub fn get_index_details(url: &str, root: Option<PathBuf>, stable: bool) -> Result<(PathBuf, String), Error> {
+pub fn get_index_details(
+    url: &str,
+    root: Option<PathBuf>,
+    stable: bool,
+) -> Result<(PathBuf, String), Error> {
     let url_dir = url_to_local_dir(url, stable)?;
 
     let mut path = match root {
@@ -320,7 +324,11 @@ mod test {
         let super::UrlDir {
             dir_name,
             canonical,
-        } = url_to_local_dir("registry+https://github.com/Rust-Lang/crates.io-index", false).unwrap();
+        } = url_to_local_dir(
+            "registry+https://github.com/Rust-Lang/crates.io-index",
+            false,
+        )
+        .unwrap();
 
         assert_eq!("https://github.com/Rust-Lang/crates.io-index", canonical);
         assert_eq!("github.com-016fae53232cc64d", dir_name);
@@ -330,7 +338,11 @@ mod test {
         let super::UrlDir {
             dir_name,
             canonical,
-        } = url_to_local_dir("git+https://gitlab.com/gilrs-project/gilrs.git?rev=1bbec17", false).unwrap();
+        } = url_to_local_dir(
+            "git+https://gitlab.com/gilrs-project/gilrs.git?rev=1bbec17",
+            false,
+        )
+        .unwrap();
 
         assert_eq!("https://gitlab.com/gilrs-project/gilrs", canonical);
         assert_eq!("gilrs-7804d1d6a17891c9", dir_name);
