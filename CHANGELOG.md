@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.18.1] - 2025-02-24
 ### Fixed
 - [PR#83](https://github.com/EmbarkStudios/tame-index/pull/83) adds an additional fix for non-crates.io urls not fixed in [PR#82](https://github.com/EmbarkStudios/tame-index/pull/82) as cargo now canonicalizes all URLs.
 
@@ -252,7 +253,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.18.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.18.1...HEAD
+[0.18.1]: https://github.com/EmbarkStudios/tame-index/compare/0.18.0...0.18.1
 [0.18.0]: https://github.com/EmbarkStudios/tame-index/compare/0.17.0...0.18.0
 [0.17.0]: https://github.com/EmbarkStudios/tame-index/compare/0.16.0...0.17.0
 [0.16.0]: https://github.com/EmbarkStudios/tame-index/compare/0.15.0...0.16.0
