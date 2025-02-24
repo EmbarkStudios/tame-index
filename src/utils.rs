@@ -44,10 +44,14 @@ pub struct UrlDir {
     pub canonical: String,
 }
 
-/// Canonicalizes a `git+` url the same as cargo
-pub fn canonicalize_url(url: &str) -> Result<String, Error> {
-    let url = url.strip_prefix("git+").unwrap_or(url);
-
+/// Canonicalizes a `git+` url the same as cargo.
+///
+/// This is similar to cargo's `CanonicalUrl`, which previously was only used for
+/// git+ url's, but since cargo 1.85.0 is now used as part of the hash for all
+/// sources. Note that cargo removes queries and fragments _only_ from git+ URLs
+/// and that happens before canonicalization, so this function does not handle them
+/// specifically as we only care about sparse and git registry URLs
+pub fn canonicalize_url(mut url: &str) -> Result<String, Error> {
     let scheme_ind = url.find("://").map(|i| i + 3).ok_or_else(|| InvalidUrl {
         url: url.to_owned(),
         source: InvalidUrlError::MissingScheme,
@@ -55,39 +59,31 @@ pub fn canonicalize_url(url: &str) -> Result<String, Error> {
 
     // Could use the Url crate for this, but it's simple enough and we don't
     // need to deal with every possible url (I hope...)
-    let host = match url[scheme_ind..].find('/') {
-        Some(end) => &url[scheme_ind..scheme_ind + end],
-        None => &url[scheme_ind..],
+    let (host, path_length) = match url[scheme_ind..].find('/') {
+        Some(end) => (
+            &url[scheme_ind..scheme_ind + end],
+            url.len() - (end + scheme_ind),
+        ),
+        None => (&url[scheme_ind..], 0),
     };
 
     // trim port
     let host = host.split(':').next().unwrap();
 
+    if path_length > 1 && url.ends_with('/') {
+        url = &url[..url.len() - 1];
+    }
+
+    if url.ends_with(".git") {
+        url = &url[..url.len() - 4];
+    }
+
     // cargo special cases github.com for reasons, so do the same
-    let mut canonical = if host == "github.com" {
+    Ok(if host == "github.com" {
         url.to_lowercase()
     } else {
         url.to_owned()
-    };
-
-    // Chop off any query params/fragments
-    if let Some(hash) = canonical.rfind('#') {
-        canonical.truncate(hash);
-    }
-
-    if let Some(query) = canonical.rfind('?') {
-        canonical.truncate(query);
-    }
-
-    if canonical.ends_with('/') {
-        canonical.pop();
-    }
-
-    if canonical.ends_with(".git") {
-        canonical.truncate(canonical.len() - 4);
-    }
-
-    Ok(canonical)
+    })
 }
 
 /// Converts a url into a relative path and its canonical form
@@ -95,11 +91,10 @@ pub fn canonicalize_url(url: &str) -> Result<String, Error> {
 /// Cargo uses a small algorithm to create unique directory names for any url
 /// so that they can be located in the same root without clashing
 ///
-/// This function currently only supports 3 different URL kinds.
+/// This function currently only supports 2 different URL kinds
 ///
 /// * `(?:registry+)?<git registry url>`
 /// * `sparse+<sparse registry url>`
-/// * `git+<git repo url>`
 #[allow(deprecated)]
 pub fn url_to_local_dir(url: &str, stable: bool) -> Result<UrlDir, Error> {
     use std::hash::{Hash, Hasher, SipHasher};
@@ -121,7 +116,6 @@ pub fn url_to_local_dir(url: &str, stable: bool) -> Result<UrlDir, Error> {
     // where it specializes _only_ isize to only write a u8 if the value is less
     // than 0xff, something that doesn't happen for usize, which of course affects
     // the calculated hash
-    const GIT_REPO: isize = 0;
     const GIT_REGISTRY: isize = 2;
     const SPARSE_REGISTRY: isize = 3;
 
@@ -142,10 +136,6 @@ pub fn url_to_local_dir(url: &str, stable: bool) -> Result<UrlDir, Error> {
                 scheme_ind -= 9;
                 (&url[9..], GIT_REGISTRY)
             }
-            Some(("git", _)) => {
-                scheme_ind -= 4;
-                (&url[4..], GIT_REPO)
-            }
             Some((_, _)) => {
                 return Err(InvalidUrl {
                     url: url.to_owned(),
@@ -158,43 +148,33 @@ pub fn url_to_local_dir(url: &str, stable: bool) -> Result<UrlDir, Error> {
         (url, scheme_ind + 3, kind)
     };
 
-    let (dir_name, url) = if kind == GIT_REPO {
+    let (dir_name, url) = if stable {
         let canonical = canonicalize_url(url)?;
 
-        // For git repo sources, the ident is made up of the last path component
-        // which for most git hosting providers is the name of the repo itself
-        // rather than the other parts of the path that indicate user/org, but
-        // the hash is the hash of the full canonical url so still unique even
-        // for repos with the same name, but different org/user owners
-        let mut dir_name = canonical
-            .split('/')
-            .next_back()
-            .unwrap_or("_empty")
-            .to_owned();
-
-        let hash = if stable {
+        let hash = {
             let mut hasher = rustc_stable_hash::StableSipHasher128::new();
+            kind.hash(&mut hasher);
             canonical.hash(&mut hasher);
             Hasher::finish(&hasher)
-        } else {
-            let mut hasher = SipHasher::new();
-            canonical.hash(&mut hasher);
-            hasher.finish()
         };
+
         let mut raw_ident = [0u8; 16];
         let ident = encode_hex(&hash.to_le_bytes(), &mut raw_ident);
 
-        dir_name.push('-');
-        dir_name.push_str(ident);
+        let dir_name = {
+            let host = match url[scheme_ind..].find('/') {
+                Some(end) => &url[scheme_ind..scheme_ind + end],
+                None => &url[scheme_ind..],
+            };
 
-        (dir_name, canonical)
+            // trim port
+            let host = host.split(':').next().unwrap();
+            host.split_once('@').map_or(host, |(_user, host)| host)
+        };
+
+        (format!("{dir_name}-{ident}"), canonical)
     } else {
-        let hash = if stable {
-            let mut hasher = rustc_stable_hash::StableSipHasher128::new();
-            kind.hash(&mut hasher);
-            url.hash(&mut hasher);
-            Hasher::finish(&hasher)
-        } else {
+        let hash = {
             let mut hasher = SipHasher::new();
             kind.hash(&mut hasher);
             url.hash(&mut hasher);
@@ -303,64 +283,6 @@ mod test {
 
     #[test]
     #[cfg(all(target_pointer_width = "64", target_endian = "little"))]
-    fn canonicalizes_git_urls() {
-        let super::UrlDir { dir_name, canonical } = url_to_local_dir("git+https://github.com/EmbarkStudios/cpal.git?rev=d59b4de#d59b4decf72a96932a1482cc27fe4c0b50c40d32", false).unwrap();
-
-        assert_eq!("https://github.com/embarkstudios/cpal", canonical);
-        assert_eq!("cpal-a7ffd7cabefac714", dir_name);
-
-        let super::UrlDir {
-            dir_name,
-            canonical,
-        } = url_to_local_dir("git+https://github.com/gfx-rs/genmesh?rev=71abe4d", false).unwrap();
-
-        assert_eq!("https://github.com/gfx-rs/genmesh", canonical);
-        assert_eq!("genmesh-401fe503e87439cc", dir_name);
-
-        // For registry urls, even if they come from github, they are _not_ canonicalized
-        // and their exact url (other than the registry+ scheme modifier) is used
-        // for the hash calculation, as technically URLs are case sensitive, but
-        // in practice doesn't matter for connection purposes
-        let super::UrlDir {
-            dir_name,
-            canonical,
-        } = url_to_local_dir(
-            "registry+https://github.com/Rust-Lang/crates.io-index",
-            false,
-        )
-        .unwrap();
-
-        assert_eq!("https://github.com/Rust-Lang/crates.io-index", canonical);
-        assert_eq!("github.com-016fae53232cc64d", dir_name);
-
-        // cargo treats github.com specially (eg lowercasing), but it _always_
-        // strips the .git extension if it exists
-        let super::UrlDir {
-            dir_name,
-            canonical,
-        } = url_to_local_dir(
-            "git+https://gitlab.com/gilrs-project/gilrs.git?rev=1bbec17",
-            false,
-        )
-        .unwrap();
-
-        assert_eq!("https://gitlab.com/gilrs-project/gilrs", canonical);
-        assert_eq!("gilrs-7804d1d6a17891c9", dir_name);
-
-        let super::UrlDir {
-            dir_name,
-            canonical,
-        } = url_to_local_dir("ssh://git@github.com/rust-lang/crates.io-index.git", false).unwrap();
-
-        assert_eq!(
-            "ssh://git@github.com/rust-lang/crates.io-index.git",
-            canonical
-        );
-        assert_eq!("github.com-01dba724c7458575", dir_name);
-    }
-
-    #[test]
-    #[cfg(all(target_pointer_width = "64", target_endian = "little"))]
     fn matches_cargo() {
         assert_eq!(
             get_index_details(crate::CRATES_IO_INDEX, Some(PathBuf::new()), false).unwrap(),
@@ -414,6 +336,38 @@ mod test {
             (
                 "registry/index/index.crates.io-1949cf8c6b5b557f".into(),
                 crate::CRATES_IO_HTTP_INDEX.to_owned(),
+            )
+        );
+        assert_eq!(
+            get_index_details(crate::CRATES_IO_INDEX, Some(PathBuf::new()), true).unwrap(),
+            (
+                "registry/index/github.com-25cdd57fae9f0462".into(),
+                crate::CRATES_IO_INDEX.to_owned(),
+            )
+        );
+        assert_eq!(
+            get_index_details(
+                "https://github.com/EmbarkStudios/cargo-test-index",
+                Some(PathBuf::new()),
+                true
+            )
+            .unwrap(),
+            (
+                "registry/index/github.com-513223c940e0f1e9".into(),
+                "https://github.com/embarkstudios/cargo-test-index".to_owned(),
+            )
+        );
+
+        assert_eq!(
+            get_index_details(
+                "sparse+https://cargo.cloudsmith.io/embark/deny/",
+                Some(PathBuf::new()),
+                true
+            )
+            .unwrap(),
+            (
+                "registry/index/cargo.cloudsmith.io-2fc1f5411e6e72fd".into(),
+                "sparse+https://cargo.cloudsmith.io/embark/deny".to_owned(),
             )
         );
     }
