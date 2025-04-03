@@ -1,6 +1,6 @@
 [package]
 name = "tame-index"
-version = "0.18.1"
+version = "0.19.0"
 edition = "2024"
 rust-version = "1.85.0"
 description = "Provides access to local and remote cargo registry indices"
