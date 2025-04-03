@@ -1,8 +1,8 @@
 #[cfg(feature = "local")]
 use crate::index::LocalRegistry;
 use crate::{
-    index::{FileLock, RemoteGitIndex, RemoteSparseIndex},
     Error, IndexKrate, KrateName,
+    index::{FileLock, RemoteGitIndex, RemoteSparseIndex},
 };
 
 /// A wrapper around either a [`RemoteGitIndex`] or [`RemoteSparseIndex`]

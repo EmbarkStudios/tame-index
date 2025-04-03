@@ -330,10 +330,12 @@ mod test {
             Error::InvalidKrateName(InvalidKrateName::InvalidLength(71))
         ));
 
-        assert!(KrateName::cargo(
-            "aaaaaaaabbbbbbbbccccccccddddddddaaaaaaaabbbbbbbbccccccccddddddddxxxxxxx"
-        )
-        .is_ok());
+        assert!(
+            KrateName::cargo(
+                "aaaaaaaabbbbbbbbccccccccddddddddaaaaaaaabbbbbbbbccccccccddddddddxxxxxxx"
+            )
+            .is_ok()
+        );
     }
 
     /// Validates the crate name can't be a reserved name

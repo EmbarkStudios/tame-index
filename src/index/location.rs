@@ -401,6 +401,7 @@ protocol = "git"
     }
 
     #[test]
+    #[allow(unsafe_code)]
     fn custom() {
         assert!(std::env::var_os("CARGO_REGISTRIES_TAME_INDEX_TEST_INDEX").is_none());
 
@@ -418,7 +419,7 @@ index = "sparse+https://some-url.com"
         index = "https://some-url.com"
         "#;
 
-        {
+        unsafe {
             std::fs::write(&cfg_toml, SPARSE).unwrap();
 
             let iurl =
@@ -441,7 +442,7 @@ index = "sparse+https://some-url.com"
             std::env::remove_var("CARGO_REGISTRIES_TAME_INDEX_TEST_INDEX");
         }
 
-        {
+        unsafe {
             std::fs::write(&cfg_toml, GIT).unwrap();
 
             let iurl =
