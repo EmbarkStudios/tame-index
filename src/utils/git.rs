@@ -1,6 +1,6 @@
 //! Utilities for working with gix that might be useful for downstream users
 
-use crate::{error::GitError, Error};
+use crate::{Error, error::GitError};
 
 /// Writes the `FETCH_HEAD` for the specified fetch outcome to the specified git
 /// repository
@@ -88,11 +88,11 @@ pub fn write_fetch_head(
             .iter()
             .any(|rspec| {
                 let rspec = rspec.to_ref();
-                if !rspec.remote().map_or(false, |r| r.ends_with(b"HEAD")) {
+                if !rspec.remote().is_some_and(|r| r.ends_with(b"HEAD")) {
                     return false;
                 }
 
-                rspec.local().map_or(false, |l| {
+                rspec.local().is_some_and(|l| {
                     l.to_str().ok().and_then(|l| {
                         l.strip_prefix("refs/remotes/")
                             .and_then(|l| l.strip_suffix("/HEAD"))

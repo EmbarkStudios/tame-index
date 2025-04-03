@@ -8,7 +8,7 @@
 
 mod utils;
 
-use tame_index::{index::cache::ValidCacheEntry, utils::get_index_details, IndexCache};
+use tame_index::{IndexCache, index::cache::ValidCacheEntry, utils::get_index_details};
 
 /// Validates that we can parse the current version of cache entries emitted by
 /// cargo by reading the cache entry that should be there for one of this crate's

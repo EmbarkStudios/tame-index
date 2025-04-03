@@ -146,11 +146,13 @@ fn downloads_and_verifies() {
     let body = res.bytes().unwrap();
 
     use bytes::Buf;
-    assert!(local::validate_checksum::<{ 16 * 1024 }>(
-        body.reader(),
-        &("7706a72ab36d8cb1f80ffbf0e071533974a60d0a308d01a5d0375bf60499a342"
-            .parse()
-            .unwrap()),
-    )
-    .unwrap());
+    assert!(
+        local::validate_checksum::<{ 16 * 1024 }>(
+            body.reader(),
+            &("7706a72ab36d8cb1f80ffbf0e071533974a60d0a308d01a5d0375bf60499a342"
+                .parse()
+                .unwrap()),
+        )
+        .unwrap()
+    );
 }
