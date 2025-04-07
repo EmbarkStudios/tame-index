@@ -10,7 +10,12 @@ name: CI
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        os:
+          - ubuntu-22.04
+          - windows-2022
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -36,7 +41,6 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          #- windows-2022
         features: ["--features git", "--features sparse", "--features local-builder,sparse"]
     runs-on: ${{ matrix.os }}
     steps:
