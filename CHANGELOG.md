@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#87](https://github.com/EmbarkStudios/tame-index/pull/87) resolved [#86](https://github.com/EmbarkStudios/tame-index/issues/86) by adding a missing `unsafe` that caused the Windows target to fail to compile.
+
 ## [0.20.0] - 2025-04-07
 ### Fixed
 - [PR#85](https://github.com/EmbarkStudios/tame-index/pull/85) updated gix -> 0.71 and tokio to 1.44.2, addressing [RUSTSEC-2025-0021](https://rustsec.org/advisories/RUSTSEC-2025-0021) and [RUSTSEC-2025-0023](https://rustsec.org/advisories/RUSTSEC-2025-0023).
