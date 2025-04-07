@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.20.0] - 2025-04-07
 ### Fixed
 - [PR#85](https://github.com/EmbarkStudios/tame-index/pull/85) updated gix -> 0.71 and tokio to 1.44.2, addressing [RUSTSEC-2025-0021](https://rustsec.org/advisories/RUSTSEC-2025-0021) and [RUSTSEC-2025-0023](https://rustsec.org/advisories/RUSTSEC-2025-0023).
 
@@ -260,7 +261,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.19.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.20.0...HEAD
+[0.20.0]: https://github.com/EmbarkStudios/tame-index/compare/0.19.0...0.20.0
 [0.19.0]: https://github.com/EmbarkStudios/tame-index/compare/0.18.1...0.19.0
 [0.18.1]: https://github.com/EmbarkStudios/tame-index/compare/0.18.0...0.18.1
 [0.18.0]: https://github.com/EmbarkStudios/tame-index/compare/0.17.0...0.18.0
