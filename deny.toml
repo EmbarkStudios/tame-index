@@ -17,12 +17,12 @@ ignore = []
 allow = [
     "MIT",
     "Apache-2.0",
-    "MPL-2.0",
     "ISC",
     "BSD-3-Clause",
     "Unicode-3.0",
 ]
 exceptions = [
+    { name = "webpki-roots", allow = ["CDLA-Permissive-2.0"] },
 ]
 
 [bans]
