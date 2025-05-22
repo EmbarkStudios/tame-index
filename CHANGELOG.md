@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#88](https://github.com/EmbarkStudios/tame-index/pull/88) updated gix -> 0.72.
+
 ## [0.20.1] - 2025-04-07
 ### Fixed
 - [PR#87](https://github.com/EmbarkStudios/tame-index/pull/87) resolved [#86](https://github.com/EmbarkStudios/tame-index/issues/86) by adding a missing `unsafe` that caused the Windows target to fail to compile.
