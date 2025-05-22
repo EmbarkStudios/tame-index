@@ -263,11 +263,7 @@ pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<crate::Version
 
     let output = cargo.output()?;
     if !output.status.success() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            "failed to request cargo version information",
-        )
-        .into());
+        return Err(io::Error::other("failed to request cargo version information").into());
     }
 
     let stdout = String::from_utf8(output.stdout)
