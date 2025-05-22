@@ -2431,7 +2431,7 @@ dependencies = [
 
 [[package]]
 name = "tame-index"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "bytes",
  "camino",
