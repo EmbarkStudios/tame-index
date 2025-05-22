@@ -20,6 +20,7 @@ allow = [
     "ISC",
     "BSD-3-Clause",
     "Unicode-3.0",
+    "Zlib",
 ]
 exceptions = [
     { name = "webpki-roots", allow = ["CDLA-Permissive-2.0"] },
