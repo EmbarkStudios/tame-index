@@ -36,6 +36,7 @@ pub use crate::utils::flock::FileLock;
 pub struct IndexConfig {
     /// Pattern for creating download URLs. See [`Self::download_url`].
     pub dl: String,
+    #[serde(default)]
     /// Base URL for publishing, etc.
     pub api: Option<String>,
 }
