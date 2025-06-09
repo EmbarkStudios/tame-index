@@ -57,9 +57,12 @@ impl<'iu> IndexUrl<'iu> {
     ) -> Result<Self, Error> {
         // If the crates.io registry has been replaced it doesn't matter what
         // the protocol for it has been changed to
-        if let Some(replacement) =
-            get_source_replacement(config_root.clone(), cargo_home, "crates-io")?
-        {
+        if let Some(replacement) = get_source_replacement(
+            config_root.clone(),
+            cargo_home,
+            crate::CRATES_IO_INDEX,
+            "crates-io",
+        )? {
             return Ok(replacement);
         }
 
@@ -143,20 +146,22 @@ impl<'iu> IndexUrl<'iu> {
             }
         }
 
-        if let Some(replacement) =
-            get_source_replacement(config_root.clone(), cargo_home, registry_name)?
-        {
+        let registry_url = read_cargo_config(config_root.clone(), cargo_home, |_, config| {
+            let path = format!("/registries/{registry_name}/index");
+            config.pointer(&path)?.as_str().map(String::from)
+        })?
+        .ok_or_else(|| Error::UnknownRegistry(registry_name.into()))?;
+
+        if let Some(replacement) = get_source_replacement(
+            config_root.clone(),
+            cargo_home,
+            &registry_url,
+            registry_name,
+        )? {
             return Ok(replacement);
         }
 
-        read_cargo_config(config_root, cargo_home, |_, config| {
-            let path = format!("/registries/{registry_name}/index");
-            config
-                .pointer(&path)?
-                .as_str()
-                .map(|si| Self::NonCratesIo(si.to_owned().into()))
-        })?
-        .ok_or_else(|| Error::UnknownRegistry(registry_name.into()))
+        Ok(Self::NonCratesIo(registry_url.into()))
     }
 }
 
@@ -321,11 +326,19 @@ pub(crate) fn read_cargo_config<T>(
 pub(crate) fn get_source_replacement<'iu>(
     root: Option<PathBuf>,
     cargo_home: Option<&Path>,
+    registry_url: &str,
     registry_name: &str,
 ) -> Result<Option<IndexUrl<'iu>>, Error> {
     read_cargo_config(root, cargo_home, |config_path, config| {
-        let path = format!("/source/{registry_name}/replace-with");
-        let repw = config.pointer(&path)?.as_str()?;
+        let sources = config.as_table()?.get("source")?.as_table()?;
+        let repw = sources.iter().find_map(|(source_name, source)| {
+            let source = source.as_table()?;
+
+            let matches = registry_name == source_name.name
+                || registry_url == source.get("registry")?.as_str()?;
+            matches.then_some(source.get("replace-with")?.as_str()?)
+        })?;
+
         let sources = config.pointer("/source")?.as_table()?;
         let replace_src = sources.get(repw)?.as_table()?;
 

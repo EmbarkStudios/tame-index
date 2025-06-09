@@ -169,7 +169,7 @@ fn finds_source_replacement() {
 credential-provider = ["cargo:token"]
 index = "sparse+https://imaginary-registry.example.net/index/"
 
-[source.imaginary-registry]
+[source._real_cargo_ignores_this_]
 registry = "sparse+https://imaginary-registry.example.net/index/"
 replace-with = "actual-registry-on-disk"
 
