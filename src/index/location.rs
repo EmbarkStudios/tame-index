@@ -70,17 +70,16 @@ impl<'iu> IndexUrl<'iu> {
             Some("sparse") => true,
             Some("git") => false,
             _ => {
-                let sparse_index =
-                    read_cargo_config(config_root, cargo_home, |config| {
-                        match config
-                            .pointer("/registries/crates-io/protocol")
-                            .and_then(|p| p.as_str())?
-                        {
-                            "sparse" => Some(true),
-                            "git" => Some(false),
-                            _ => None,
-                        }
-                    })?;
+                let sparse_index = read_cargo_config(config_root, cargo_home, |_, config| {
+                    match config
+                        .pointer("/registries/crates-io/protocol")
+                        .and_then(|p| p.as_str())?
+                    {
+                        "sparse" => Some(true),
+                        "git" => Some(false),
+                        _ => None,
+                    }
+                })?;
 
                 if let Some(si) = sparse_index {
                     si
@@ -150,7 +149,7 @@ impl<'iu> IndexUrl<'iu> {
             return Ok(replacement);
         }
 
-        read_cargo_config(config_root, cargo_home, |config| {
+        read_cargo_config(config_root, cargo_home, |_, config| {
             let path = format!("/registries/{registry_name}/index");
             config
                 .pointer(&path)?
@@ -268,7 +267,7 @@ impl<'il> IndexLocation<'il> {
 pub(crate) fn read_cargo_config<T>(
     root: Option<PathBuf>,
     cargo_home: Option<&Path>,
-    callback: impl Fn(&toml_span::value::Value<'_>) -> Option<T>,
+    callback: impl Fn(&Path, &toml_span::value::Value<'_>) -> Option<T>,
 ) -> Result<Option<T>, Error> {
     if let Some(mut path) = root.or_else(|| {
         std::env::current_dir()
@@ -284,7 +283,7 @@ pub(crate) fn read_cargo_config<T>(
                 };
 
                 let toml = toml_span::parse(&contents).map_err(Box::new)?;
-                if let Some(value) = callback(&toml) {
+                if let Some(value) = callback(&path, &toml) {
                     return Ok(Some(value));
                 }
             }
@@ -306,7 +305,7 @@ pub(crate) fn read_cargo_config<T>(
         if path.exists() {
             let fc = std::fs::read_to_string(&path)?;
             let toml = toml_span::parse(&fc).map_err(Box::new)?;
-            if let Some(value) = callback(&toml) {
+            if let Some(value) = callback(&path, &toml) {
                 return Ok(Some(value));
             }
         }
@@ -324,7 +323,7 @@ pub(crate) fn get_source_replacement<'iu>(
     cargo_home: Option<&Path>,
     registry_name: &str,
 ) -> Result<Option<IndexUrl<'iu>>, Error> {
-    read_cargo_config(root, cargo_home, |config| {
+    read_cargo_config(root, cargo_home, |_, config| {
         let path = format!("/source/{registry_name}/replace-with");
         let repw = config.pointer(&path)?.as_str()?;
         let sources = config.pointer("/source")?.as_table()?;
