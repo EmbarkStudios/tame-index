@@ -323,7 +323,7 @@ pub(crate) fn get_source_replacement<'iu>(
     cargo_home: Option<&Path>,
     registry_name: &str,
 ) -> Result<Option<IndexUrl<'iu>>, Error> {
-    read_cargo_config(root, cargo_home, |_, config| {
+    read_cargo_config(root, cargo_home, |config_path, config| {
         let path = format!("/source/{registry_name}/replace-with");
         let repw = config.pointer(&path)?.as_str()?;
         let sources = config.pointer("/source")?.as_table()?;
@@ -333,8 +333,10 @@ pub(crate) fn get_source_replacement<'iu>(
             rr.as_str()
                 .map(|r| IndexUrl::NonCratesIo(r.to_owned().into()))
         } else if let Some(rlr) = replace_src.get("local-registry") {
-            rlr.as_str()
-                .map(|l| IndexUrl::Local(PathBuf::from(l).into()))
+            let rel_path = rlr.as_str()?;
+            Some(IndexUrl::Local(
+                config_path.parent()?.parent()?.join(rel_path).into(),
+            ))
         } else {
             None
         }
