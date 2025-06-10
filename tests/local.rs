@@ -156,3 +156,52 @@ fn downloads_and_verifies() {
         .unwrap()
     );
 }
+
+#[test]
+fn finds_source_replacement() {
+    let td = tempfile::tempdir().unwrap();
+    let cfg_toml = td.path().join(".cargo/config.toml");
+    std::fs::create_dir_all(cfg_toml.parent().unwrap()).unwrap();
+    std::fs::write(
+        &cfg_toml,
+        r#"
+[registries.imaginary-registry]
+credential-provider = ["cargo:token"]
+index = "sparse+https://imaginary-registry.example.net/index/"
+
+[source._real_cargo_ignores_this_]
+registry = "sparse+https://imaginary-registry.example.net/index/"
+replace-with = "actual-registry-on-disk"
+
+[source.actual-registry-on-disk]
+local-registry = "test-local-registry"
+"#,
+    )
+    .unwrap();
+
+    let meta_path = td
+        .path()
+        .join("test-local-registry/index/ex/am/example-dependency");
+    std::fs::create_dir_all(meta_path.parent().unwrap()).unwrap();
+    std::fs::write(&meta_path, r#"{"name":"example-dependency","vers":"2.0.0","deps":[],"cksum":"a89f6827d6042043aa77282b091280d2ebb47365e3ff097d07f45b5a797dff63","features":{},"yanked":false}"#).unwrap();
+
+    let subdir = td.path().join("test-subdirectory");
+    std::fs::create_dir_all(&subdir).unwrap();
+
+    let url = tame_index::IndexUrl::for_registry_name(
+        Some(subdir.try_into().unwrap()),
+        None,
+        "imaginary-registry",
+    )
+    .unwrap();
+
+    assert!(matches!(url, tame_index::IndexUrl::Local(_)));
+    let index =
+        tame_index::index::ComboIndexCache::new(tame_index::IndexLocation::new(url)).unwrap();
+    let lock = tame_index::utils::flock::FileLock::unlocked();
+    let krate = index
+        .cached_krate("example-dependency".try_into().unwrap(), &lock)
+        .unwrap()
+        .unwrap();
+    assert_eq!("2.0.0", krate.versions[0].version);
+}
