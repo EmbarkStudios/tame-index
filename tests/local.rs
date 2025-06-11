@@ -31,7 +31,7 @@ fn builds_local_registry() {
     let lock = tame_index::utils::flock::FileLock::unlocked();
 
     for pkg in &md.packages {
-        if pkg.name == "tame-index" {
+        if pkg.name.as_ref() == "tame-index" {
             continue;
         }
         let ip = krates.entry(pkg.name.clone()).or_insert_with(|| {

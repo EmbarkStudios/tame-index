@@ -33,15 +33,17 @@ pub use crate::utils::flock::FileLock;
 
 /// Global configuration of an index, reflecting the [contents of config.json](https://doc.rust-lang.org/cargo/reference/registries.html#index-format).
 #[derive(Eq, PartialEq, PartialOrd, Ord, Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "kebab-case")]
 pub struct IndexConfig {
     /// Pattern for creating download URLs. See [`Self::download_url`].
     pub dl: String,
     #[serde(default)]
     /// Base URL for publishing, etc.
     pub api: Option<String>,
-    #[serde(default)]
-    auth_required: bool,
+    /// Indicates whether this is a private registry that requires all
+    /// operations to be authenticated including API requests, crate downloads
+    /// and sparse index updates.
+    #[serde(default, rename = "auth-required")]
+    pub auth_required: bool,
 }
 
 impl IndexConfig {
