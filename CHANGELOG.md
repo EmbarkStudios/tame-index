@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.22.0] - 2025-06-11
 ### Changed
 - [PR#90](https://github.com/EmbarkStudios/tame-index/pull/90) updated the `IndexConfig` to match the current cargo schema, thanks [nox](https://github.com/nox)!
 - [PR#91](https://github.com/EmbarkStudios/tame-index/pull/91) updated the source replacement code to be able to find replacements in relative paths from the project, thanks [nox](https://github.com/nox)!
@@ -273,7 +274,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.21.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.22.0...HEAD
+[0.22.0]: https://github.com/EmbarkStudios/tame-index/compare/0.21.0...0.22.0
 [0.21.0]: https://github.com/EmbarkStudios/tame-index/compare/0.20.1...0.21.0
 [0.20.1]: https://github.com/EmbarkStudios/tame-index/compare/0.20.0...0.20.1
 [0.20.0]: https://github.com/EmbarkStudios/tame-index/compare/0.19.0...0.20.0
