@@ -85,7 +85,7 @@ features = ["blocking", "gzip", "http2"]
 libc = "0.2"
 
 [dev-dependencies]
-cargo_metadata = "0.19"
+cargo_metadata = "0.20"
 rayon = "1.7"
 tempfile = "3.15"
 tiny-bench = "0.4"
