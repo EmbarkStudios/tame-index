@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#90](https://github.com/EmbarkStudios/tame-index/pull/90) updated the `IndexConfig` to match the current cargo schema, thanks [nox](https://github.com/nox)!
+- [PR#91](https://github.com/EmbarkStudios/tame-index/pull/91) updated the source replacement code to be able to find replacements in relative paths from the project, thanks [nox](https://github.com/nox)!
+
 ## [0.21.0] - 2025-05-22
 ### Changed
 - [PR#88](https://github.com/EmbarkStudios/tame-index/pull/88) updated gix -> 0.72.
