@@ -70,7 +70,7 @@ twox-hash = { version = "2.1", default-features = false, features = ["xxhash64"]
 
 [dependencies.gix]
 optional = true
-version = "0.72"
+version = "0.73"
 default-features = false
 features = []
 
@@ -85,7 +85,7 @@ features = ["blocking", "gzip", "http2"]
 libc = "0.2"
 
 [dev-dependencies]
-cargo_metadata = "0.20"
+cargo_metadata = "0.21"
 rayon = "1.7"
 tempfile = "3.15"
 tiny-bench = "0.4"
