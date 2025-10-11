@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.23.1] - 2025-10-11
 ### Fixed
 - [PR#95](https://github.com/EmbarkStudios/tame-index/pull/95) resolved [#94](https://github.com/EmbarkStudios/tame-index/issues/94) by actually using an infinite timeout on Windows when timeout is `None`.
 
@@ -281,7 +282,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.23.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.23.1...HEAD
+[0.23.1]: https://github.com/EmbarkStudios/tame-index/compare/0.23.0...0.23.1
 [0.23.0]: https://github.com/EmbarkStudios/tame-index/compare/0.22.0...0.23.0
 [0.22.0]: https://github.com/EmbarkStudios/tame-index/compare/0.21.0...0.22.0
 [0.21.0]: https://github.com/EmbarkStudios/tame-index/compare/0.20.1...0.21.0
