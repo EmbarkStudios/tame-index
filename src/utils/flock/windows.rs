@@ -76,7 +76,7 @@ fn flock(file: &File, flags: u32, timeout: Option<Duration>) -> Result {
             let err = Error::last_os_error();
 
             if err.raw_os_error() == Some(Win32Error::ErrorIoPending as i32) {
-                let timeout = timeout.map_or(0, |dur| {
+                let timeout = timeout.map_or(u32::MAX, |dur| {
                     let millis = dur.as_millis();
                     if millis >= Infinite as u128 {
                         u32::MAX
