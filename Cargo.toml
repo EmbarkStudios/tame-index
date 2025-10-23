@@ -70,7 +70,7 @@ twox-hash = { version = "2.1", default-features = false, features = ["xxhash64"]
 
 [dependencies.gix]
 optional = true
-version = "0.73"
+version = "0.74.1"
 default-features = false
 features = []
 
