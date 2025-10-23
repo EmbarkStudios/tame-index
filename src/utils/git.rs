@@ -67,8 +67,8 @@ pub fn write_fetch_head(
 
     let fetch_head = {
         let mut hex_id = [0u8; 40];
-        let gix::ObjectId::Sha1(sha1) = oid;
-        let commit_id = crate::utils::encode_hex(sha1, &mut hex_id);
+        let sha1 = unwrap_sha1(*oid);
+        let commit_id = crate::utils::encode_hex(&sha1, &mut hex_id);
 
         let mut fetch_head = String::new();
 
@@ -138,4 +138,13 @@ pub fn write_fetch_head(
         .map_err(|io| Error::IoPath(io, fetch_head_path))?;
 
     Ok(*oid)
+}
+
+/// Workaround for `#[non_exhaustive]`
+#[inline]
+pub fn unwrap_sha1(oid: gix::ObjectId) -> [u8; 20] {
+    let gix::ObjectId::Sha1(sha1) = oid else {
+        unreachable!()
+    };
+    sha1
 }
