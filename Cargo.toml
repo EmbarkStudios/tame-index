@@ -64,7 +64,7 @@ tokio = { version = "1.44", default-features = false, features = [
     "time",
 ], optional = true }
 # cargo config parsing
-toml-span = "0.5"
+toml-span = "0.6"
 # Faster hashing
 twox-hash = { version = "2.1", default-features = false, features = ["xxhash64"] }
 
