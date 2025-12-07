@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(target_pointer_width = "64")]
 
 //! Note we only run these tests if _built_ for 64-bit, as the only test targets
