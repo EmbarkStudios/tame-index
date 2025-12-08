@@ -274,7 +274,7 @@ pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<crate::Version
 
 #[cfg(test)]
 mod test {
-    use super::{get_index_details, url_to_local_dir};
+    use super::get_index_details;
     use crate::PathBuf;
 
     #[test]
@@ -320,7 +320,9 @@ mod test {
         const FAKE_REGISTRY: &str = "https://github.com/RustSec/advisory-db";
 
         assert_eq!(
-            url_to_local_dir(FAKE_REGISTRY, false).unwrap().dir_name,
+            super::url_to_local_dir(FAKE_REGISTRY, false)
+                .unwrap()
+                .dir_name,
             "github.com-a946fc29ac602819"
         );
     }
