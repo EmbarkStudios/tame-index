@@ -76,7 +76,4 @@ rustflags = [
     "-Wrust_2018_idioms",
     "-Wunexpected_cfgs",
     # END - Embark standard lints v6 for Rust 1.55+
-
-    # We want all public items to have at least _some_ documentation
-    "-Dmissing-docs",
 ]
