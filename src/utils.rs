@@ -277,6 +277,8 @@ mod test {
     use super::get_index_details;
     use crate::PathBuf;
 
+    /// Tests that we match the old pre-1.85.0 hashing. Note that the old hashing
+    /// was both pointer size and endian specific, hence the cfg
     #[test]
     #[cfg(all(target_pointer_width = "64", target_endian = "little"))]
     fn matches_cargo() {
@@ -327,6 +329,8 @@ mod test {
         );
     }
 
+    /// Tests that we match cargo 1.85.0+. 1.85.0 introduced a change/fix so that
+    /// the calculated hash is the same across architectures, which wasn't the case before
     #[test]
     fn matches_cargo_1850() {
         assert_eq!(
