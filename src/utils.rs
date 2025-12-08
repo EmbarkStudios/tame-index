@@ -274,9 +274,11 @@ pub fn cargo_version(working_dir: Option<&crate::Path>) -> Result<crate::Version
 
 #[cfg(test)]
 mod test {
-    use super::{get_index_details, url_to_local_dir};
+    use super::get_index_details;
     use crate::PathBuf;
 
+    /// Tests that we match the old pre-1.85.0 hashing. Note that the old hashing
+    /// was both pointer size and endian specific, hence the cfg
     #[test]
     #[cfg(all(target_pointer_width = "64", target_endian = "little"))]
     fn matches_cargo() {
@@ -320,11 +322,15 @@ mod test {
         const FAKE_REGISTRY: &str = "https://github.com/RustSec/advisory-db";
 
         assert_eq!(
-            url_to_local_dir(FAKE_REGISTRY, false).unwrap().dir_name,
+            super::url_to_local_dir(FAKE_REGISTRY, false)
+                .unwrap()
+                .dir_name,
             "github.com-a946fc29ac602819"
         );
     }
 
+    /// Tests that we match cargo 1.85.0+. 1.85.0 introduced a change/fix so that
+    /// the calculated hash is the same across architectures, which wasn't the case before
     #[test]
     fn matches_cargo_1850() {
         assert_eq!(

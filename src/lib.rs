@@ -1,4 +1,5 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
 
 pub mod error;
