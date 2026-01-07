@@ -82,7 +82,7 @@ pub fn fake_krate(name: &str, num_versions: u8) -> IndexKrate {
 
 #[cfg(feature = "sparse")]
 pub fn tls_config() -> rustls::ClientConfig {
-    let rcs = rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let rcs: rustls::RootCertStore = webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect();
     rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(
         rustls::crypto::ring::default_provider(),
     ))
