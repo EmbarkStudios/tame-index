@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - [PR#103](https://github.com/EmbarkStudios/tame-index/pull/103) removed the `gix` based support for fetching and accessing git registry indices, resolving [#98](https://github.com/EmbarkStudios/tame-index/issues/98). Those who need to access them can use older versions of this crate, [crates-index](https://github.com/frewsxcv/rust-crates-index), or roll their own.
 
+### Changed
+- [PR#104](https://github.com/EmbarkStudios/tame-index/pull/104) updated `reqwest` to 0.13. Due to the changes in `reqwest:0.13.0` related to TLS, `tame-index` no longer provides TLS related feature flags, leaving it completely up to the user to properly configure TLS on the client before passing it. See [tls.rs](examples/tls.rs) for an example of how one can configure a client.
+
 ## [0.25.0] - 2025-11-23
 ### Changed
 - [PR#97](https://github.com/EmbarkStudios/tame-index/pull/97) updated gix -> 0.75.
