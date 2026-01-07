@@ -22,8 +22,6 @@ pub use semver::Version;
 /// Reexports of some crates for easier downstream usage without requiring adding
 /// your own dependencies
 pub mod external {
-    #[cfg(feature = "__git")]
-    pub use gix;
     pub use http;
     #[cfg(any(feature = "sparse", feature = "local-builder"))]
     pub use reqwest;

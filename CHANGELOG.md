@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Removed
+- [PR#103](https://github.com/EmbarkStudios/tame-index/pull/103) removed the `gix` based support for fetching and accessing git registry indices, resolving [#98](https://github.com/EmbarkStudios/tame-index/issues/98). Those who need to access them can use older versions of this crate, [crates-index](https://github.com/frewsxcv/rust-crates-index), or roll their own.
+
 ## [0.25.0] - 2025-11-23
 ### Changed
 - [PR#97](https://github.com/EmbarkStudios/tame-index/pull/97) updated gix -> 0.75.
