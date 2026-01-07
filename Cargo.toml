@@ -10,16 +10,13 @@ homepage = "https://github.com/EmbarkStudios/tame-index"
 repository = "https://github.com/EmbarkStudios/tame-index"
 
 [features]
-default = ["reqwest?/rustls-tls-webpki-roots"]
+default = []
 # Enables the built-in support for requesting index entries from a HTTP sparse registry index
 sparse = ["dep:reqwest", "dep:tokio", "dep:rayon", "dep:crossbeam-channel"]
 # Enables local registry support
 local = ["dep:sha2", "dep:bytes"]
 # Enables helpers for building a local registry
 local-builder = ["local", "dep:reqwest"]
-# Enables the use of OS native certificate store.
-# Should be used with `default-features = false` to also disable webpki-roots, which is activated by default.
-native-certs = ["reqwest?/rustls-tls-native-roots"]
 
 [dependencies]
 bytes = { version = "1.11", optional = true }
@@ -57,10 +54,9 @@ toml-span = "0.6"
 # Faster hashing
 twox-hash = { version = "2.1", default-features = false, features = ["xxhash64"] }
 
-# Keep version aligned with gix-transport
 [dependencies.reqwest]
 optional = true
-version = "0.12"
+version = "0.13"
 default-features = false
 features = ["blocking", "gzip", "http2"]
 
@@ -70,8 +66,11 @@ libc = "0.2"
 [dev-dependencies]
 cargo_metadata = "0.23"
 rayon = "1.7"
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 tempfile = "3.15"
 tiny-bench = "0.4"
+webpki-roots = "1.0"
 
 [package.metadata.docs.rs]
 all-features = true
