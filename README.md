@@ -20,6 +20,7 @@
 
 ## Differences from [`crates-index`][0]
 
+1. `tame-index` as of version 0.26.0 **no longer supports fetching or accessing git registry repositories**.
 1. The API exposes enough pieces where an alternative git implementation can be used if `gix` is not to your liking.
 1. Sparse index support via [`reqwest`](https://crates.io/crates/reqwest) is optional, gated behind the `sparse` feature flag.
 1. Local cache files are always supported regardless of features enabled
