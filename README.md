@@ -30,6 +30,10 @@
 1. Building of local registries is available behind the `local-builder` feature flag
 1. File-based locking compatible with Cargo is available to ensure `tame-index` and Cargo can play nicely together.
 
+## `sparse` feature
+
+Enabling the `sparse` feature gives built-in support for fetching from HTTP sparse indices via `reqwest`. `tame-index` does not take a stance on TLS, thus it is the responsibility of the user to properly configure the client that they pass to `tame-index`. See `examples/tls.rs` for an example of how one can configure a Client using `rustls`, `ring`, and `webpki-roots`.
+
 ## Contributing
 
 [![Contributor Covenant](https://img.shields.io/badge/contributor%20covenant-v1.4-ff69b4.svg)](CODE_OF_CONDUCT.md)
