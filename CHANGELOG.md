@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#106](https://github.com/EmbarkStudios/tame-index/pull/106) added the [`pubtime`](https://blog.rust-lang.org/inside-rust/2026/01/07/this-development-cycle-in-cargo-1.93/#pubtime) field, the RFC3339 timestamp when the crate was published to its source registry.
+
 ## [0.26.0] - 2026-01-07
 ### Removed
 - [PR#103](https://github.com/EmbarkStudios/tame-index/pull/103) removed the `gix` based support for fetching and accessing git registry indices, resolving [#98](https://github.com/EmbarkStudios/tame-index/issues/98). Those who need to access them can use older versions of this crate, [crates-index](https://github.com/frewsxcv/rust-crates-index), or roll their own.
