@@ -10,8 +10,10 @@
 //! 2. Add the `rustls-no-provider` feature to `reqwest` to enable the `tls_backend_preconfigured` method
 //! 3. Add dependencies on `rustls` (the same version `reqwest` uses) and `webpki-roots`
 
-#![cfg(feature = "sparse")]
+#[cfg(not(feature = "sparse"))]
+fn main() {}
 
+#[cfg(feature = "sparse")]
 fn main() {
     // Create a certificate store using webpki_roots, which packages
     let rcs: rustls::RootCertStore = webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect();
