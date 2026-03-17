@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.26.1] - 2026-03-17
 ### Fixed
 - [PR#106](https://github.com/EmbarkStudios/tame-index/pull/106) added the [`pubtime`](https://blog.rust-lang.org/inside-rust/2026/01/07/this-development-cycle-in-cargo-1.93/#pubtime) field, the RFC3339 timestamp when the crate was published to its source registry.
 
@@ -304,7 +305,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.26.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.26.1...HEAD
+[0.26.1]: https://github.com/EmbarkStudios/tame-index/compare/0.26.0...0.26.1
 [0.26.0]: https://github.com/EmbarkStudios/tame-index/compare/0.25.0...0.26.0
 [0.25.0]: https://github.com/EmbarkStudios/tame-index/compare/0.24.1...0.25.0
 [0.24.1]: https://github.com/EmbarkStudios/tame-index/compare/0.24.0...0.24.1
