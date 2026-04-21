@@ -9,7 +9,21 @@ pub mod flock;
 /// `.cargo` or `CARGO_HOME`
 #[inline]
 pub fn cargo_home() -> Result<crate::PathBuf, crate::Error> {
-    Ok(crate::PathBuf::from_path_buf(home::cargo_home()?)?)
+    let chome = if let Some(home) = std::env::var_os("CARGO_HOME")
+        && !home.is_empty()
+    {
+        let home = std::path::PathBuf::from(home);
+        if home.is_absolute() {
+            home
+        } else {
+            std::env::current_dir()?.join(&home)
+        }
+    } else {
+        std::env::home_dir()
+            .ok_or(std::io::Error::other("unable to determine home directory"))?
+            .join(".cargo")
+    };
+    Ok(crate::PathBuf::from_path_buf(chome)?)
 }
 
 /// Encodes a slice of bytes into a hexadecimal string to the specified buffer
