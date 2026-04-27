@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.26.3] - 2026-04-27
 ### Changed
 - [PR#111](https://github.com/EmbarkStudios/tame-index/pull/111) removed the dependency on `home`.
 
@@ -312,7 +313,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.26.2...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.26.3...HEAD
+[0.26.3]: https://github.com/EmbarkStudios/tame-index/compare/0.26.2...0.26.3
 [0.26.2]: https://github.com/EmbarkStudios/tame-index/compare/0.26.1...0.26.2
 [0.26.1]: https://github.com/EmbarkStudios/tame-index/compare/0.26.0...0.26.1
 [0.26.0]: https://github.com/EmbarkStudios/tame-index/compare/0.25.0...0.26.0
