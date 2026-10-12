@@ -19,6 +19,7 @@ pub struct Request {
     pub headers: [(Name, Value); 3],
 }
 
+#[allow(clippy::fallible_impl_from)]
 impl From<Request> for http::Request<()> {
     fn from(value: Request) -> Self {
         let mut r = http::Request::get(value.uri);
@@ -46,16 +47,13 @@ where
     fn from(value: &'r http::Response<B>) -> Self {
         let hdrs = value.headers();
 
-        let revision = if let Some(etag) = hdrs.get(header::ETAG).and_then(|v| v.to_str().ok()) {
-            Some(HttpRevision::Etag(etag))
-        } else if let Some(lm) = hdrs
-            .get(header::LAST_MODIFIED)
-            .and_then(|v| v.to_str().ok())
-        {
-            Some(HttpRevision::LastModified(lm))
-        } else {
-            None
-        };
+        let revision = hdrs
+            .get(header::ETAG)
+            .and_then(|v| v.to_str().ok().map(HttpRevision::Etag))
+            .or_else(|| {
+                hdrs.get(header::LAST_MODIFIED)
+                    .and_then(|v| v.to_str().ok().map(HttpRevision::LastModified))
+            });
 
         Self {
             status_code: value.status(),
@@ -296,6 +294,7 @@ pub struct EtagCache {
     cache: Vec<(smol_str::SmolStr, String)>,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for EtagCache {
     fn default() -> Self {
         Self { cache: Vec::new() }

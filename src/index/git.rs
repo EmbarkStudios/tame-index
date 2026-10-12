@@ -19,11 +19,6 @@ impl Sha1Hex {
     pub(crate) fn empty() -> Self {
         Self([0u8; _])
     }
-
-    #[inline]
-    pub const fn len(&self) -> usize {
-        40
-    }
 }
 
 impl AsRef<[u8]> for Sha1Hex {
@@ -138,7 +133,7 @@ impl GitIndex {
         blob_id: Option<Sha1Hex>,
         lock: &FileLock,
     ) -> Result<Option<PathBuf>, Error> {
-        let Some(id) = blob_id.or_else(|| self.head_commit().map(|h| *h)) else {
+        let Some(id) = blob_id.or_else(|| self.head_commit().copied()) else {
             return Ok(None);
         };
         self.cache

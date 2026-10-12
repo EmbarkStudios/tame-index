@@ -175,7 +175,7 @@ impl IndexKrate {
 
         const PAGE_SIZE: usize = 4 * 1024;
 
-        /// std::io::BufWriter does a heap allocation for its scratch buffer, so just avoid that in favor
+        /// `std::io::BufWriter` does a heap allocation for its scratch buffer, so just avoid that in favor
         /// of a small stack buffer instead
         struct StackWriter<'w, W> {
             buf: [u8; PAGE_SIZE],
@@ -333,8 +333,9 @@ impl Revision<'_> {
                     out.len()
                 }
                 GitRevision::Hex(sha1) => {
-                    w.write_all(sha1.as_ref())?;
-                    sha1.len()
+                    let b = sha1.as_ref();
+                    w.write_all(b)?;
+                    b.len()
                 }
             },
             Self::Unknown => {
@@ -351,8 +352,8 @@ impl PartialEq for Revision<'_> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Http(a), Self::Http(b)) => match (a, b) {
-                (HttpRevision::Etag(a), HttpRevision::Etag(b)) => a == b,
-                (HttpRevision::LastModified(a), HttpRevision::LastModified(b)) => a == b,
+                (HttpRevision::Etag(a), HttpRevision::Etag(b))
+                | (HttpRevision::LastModified(a), HttpRevision::LastModified(b)) => a == b,
                 _ => false,
             },
             (Self::Git(a), Self::Git(b)) => a == b,
