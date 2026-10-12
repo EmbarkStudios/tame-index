@@ -184,7 +184,7 @@ impl SparseIndex {
     pub fn parse_remote_response(
         &self,
         name: KrateName<'_>,
-        response: http::Response<Vec<u8>>,
+        response: http::Response<&[u8]>,
         write_cache_entry: bool,
         lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
@@ -194,7 +194,7 @@ impl SparseIndex {
         match parts.status {
             // The server responded with the full contents of the index entry
             StatusCode::OK => {
-                let krate = IndexKrate::from_slice(&body)?;
+                let krate = IndexKrate::from_slice(body)?;
 
                 if write_cache_entry {
                     // The same as cargo, prefer etag over last-modified
@@ -239,5 +239,57 @@ impl SparseIndex {
             }
             .into()),
         }
+    }
+}
+
+pub struct EtagCache {
+    cache: Vec<(smol_str::SmolStr, String)>,
+}
+
+impl Default for EtagCache {
+    fn default() -> Self {
+        Self { cache: Vec::new() }
+    }
+}
+
+impl EtagCache {
+    #[inline]
+    pub fn make_remote_request(
+        &self,
+        index: &SparseIndex,
+        name: KrateName<'_>,
+        lock: &FileLock,
+    ) -> Result<http::Request<()>, Error> {
+        let etag = self
+            .cache
+            .binary_search_by_key(&name.0, |(kn, _)| kn.as_str())
+            .ok()
+            .map(|i| self.cache[i].1.as_str());
+
+        index.make_remote_request(name, etag, lock)
+    }
+
+    #[inline]
+    pub fn parse_remote_response(
+        &mut self,
+        index: &SparseIndex,
+        name: KrateName<'_>,
+        response: http::Response<&[u8]>,
+        write_cache_entry: bool,
+        lock: &FileLock,
+    ) -> Result<Option<IndexKrate>, Error> {
+        if let Some(etag) = response.headers().get(http::header::ETAG)
+            && let Ok(etag) = etag.to_str()
+        {
+            match self
+                .cache
+                .binary_search_by_key(&name.0, |(krate, _)| krate.as_str())
+            {
+                Ok(i) => etag.clone_into(&mut self.cache[i].1),
+                Err(i) => self.cache.insert(i, (name.0.into(), etag.to_owned())),
+            }
+        }
+
+        index.parse_remote_response(name, response, write_cache_entry, lock)
     }
 }

@@ -168,10 +168,6 @@ pub enum CacheError {
 /// Errors related to HTTP requests or responses
 #[derive(Debug, thiserror::Error)]
 pub enum HttpError {
-    /// A [`reqwest::Error`]
-    #[cfg(any(feature = "sparse", feature = "local-builder"))]
-    #[error(transparent)]
-    Reqwest(#[from] reqwest::Error),
     /// A status code was received that indicates user error, or possibly a
     /// remote index that does not follow the protocol supported by this crate
     #[error("status code '{code}': {msg}")]

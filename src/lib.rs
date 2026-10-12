@@ -13,7 +13,7 @@ pub use camino::{Utf8Path as Path, Utf8PathBuf as PathBuf};
 pub use error::{CacheError, Error, HttpError, InvalidUrl, InvalidUrlError};
 pub use index::{
     GitIndex, IndexCache, IndexLocation, IndexPath, IndexUrl, SparseIndex, git::CRATES_IO_INDEX,
-    sparse::CRATES_IO_HTTP_INDEX,
+    sparse::CRATES_IO_HTTP_INDEX, sparse::EtagCache,
 };
 pub use krate::{IndexDependency, IndexKrate, IndexVersion};
 pub use krate_name::KrateName;
@@ -23,8 +23,4 @@ pub use semver::Version;
 /// your own dependencies
 pub mod external {
     pub use http;
-    #[cfg(any(feature = "sparse", feature = "local-builder"))]
-    pub use reqwest;
-    #[cfg(any(feature = "sparse", feature = "local-builder"))]
-    pub use tokio;
 }

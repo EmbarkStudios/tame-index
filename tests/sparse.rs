@@ -113,7 +113,7 @@ fn parse_unmodified_response() {
     let response = http::Response::builder()
         .status(http::StatusCode::NOT_MODIFIED)
         .header(header::ETAG, ETAG)
-        .body(Vec::new())
+        .body::<&[u8]>(&[])
         .unwrap();
 
     let cached_krate = index
@@ -139,7 +139,7 @@ fn parse_modified_response() {
         let response = http::Response::builder()
             .status(http::StatusCode::OK)
             .header(header::ETAG, ETAG)
-            .body(serialized)
+            .body::<&[u8]>(&serialized)
             .unwrap();
 
         let new_krate = index
@@ -170,7 +170,7 @@ fn parse_modified_response() {
         let response = http::Response::builder()
             .status(http::StatusCode::OK)
             .header(header::LAST_MODIFIED, DATE)
-            .body(serialized)
+            .body::<&[u8]>(&serialized)
             .unwrap();
 
         let new_krate = index
@@ -194,7 +194,6 @@ fn parse_modified_response() {
     }
 }
 
-#[cfg(feature = "sparse")]
 mod remote {
     use super::*;
 

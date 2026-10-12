@@ -9,8 +9,6 @@ pub mod local;
 pub mod location;
 #[allow(missing_docs)]
 pub mod sparse;
-#[cfg(feature = "sparse")]
-mod sparse_remote;
 
 pub use cache::IndexCache;
 pub use git::GitIndex;
@@ -18,8 +16,6 @@ pub use git::GitIndex;
 pub use local::LocalRegistry;
 pub use location::{IndexLocation, IndexPath, IndexUrl};
 pub use sparse::SparseIndex;
-#[cfg(feature = "sparse")]
-pub use sparse_remote::{AsyncRemoteSparseIndex, RemoteSparseIndex};
 
 pub use crate::utils::flock::FileLock;
 

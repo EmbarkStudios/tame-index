@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-#![cfg(all(feature = "local-builder", feature = "sparse"))]
+#![cfg(feature = "local-builder")]
 
 mod utils;
 
