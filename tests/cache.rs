@@ -31,7 +31,12 @@ fn parses_current_cargo_cache() {
         .expect("failed to parse cargo cache file, we might need to update this crate");
 
     assert!(
-        vce.revision.starts_with("etag:"),
+        matches!(
+            vce.revision,
+            tame_index::index::cache::Revision::Http(
+                tame_index::index::sparse::HttpRevision::Etag(_)
+            )
+        ),
         "cargo rarely/never writes anything but etag revisions to the cache"
     );
 
@@ -74,11 +79,49 @@ fn serializes_current_cargo_cache() {
 
     let mut ours = Vec::new();
     cargos_krate
-        .write_cache_entry(&mut ours, cargo_ce.revision)
+        .write_cache_entry(&mut ours, &cargo_ce.revision)
         .expect("failed to write");
 
     let our_ce = ValidCacheEntry::read(&ours).expect("failed to parse our cache file");
 
     assert_eq!(cargo_ce.revision, our_ce.revision);
-    assert_eq!(cargo_ce.version_entries, our_ce.version_entries);
+
+    let mut cargos = tame_index::index::cache::split(cargo_ce.version_entries, 0);
+    let mut ours = tame_index::index::cache::split(our_ce.version_entries, 0);
+
+    while let Some(cv) = cargos.next() {
+        let cv = std::str::from_utf8(cv).unwrap();
+        let Some(ov) = ours.next() else {
+            panic!("cargo had version '{cv}' but we did not");
+        };
+
+        let ov = std::str::from_utf8(ov).unwrap();
+        assert_eq!(cv, ov, "version mismatch");
+
+        match (cargos.next(), ours.next()) {
+            (Some(c), Some(v)) => {
+                if c.len() != v.len() {
+                    panic!(
+                        "cargo '{cv}' had {} bytes but we had {} bytes",
+                        c.len(),
+                        v.len()
+                    );
+                } else {
+                    assert_eq!(c, v);
+                }
+            }
+            (Some(c), None) => {
+                panic!(
+                    "cargo '{cv}' had an entry of {} bytes but we had none",
+                    c.len()
+                );
+            }
+            (None, _) => {
+                panic!("cargo version '{cv}' didn't have an entry",)
+            }
+        }
+    }
+
+    let remaining = ours.count() / 2;
+    assert_eq!(remaining, 0, "we had entries cargo did not");
 }

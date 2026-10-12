@@ -20,7 +20,7 @@ local-builder = ["local"]
 bytes = { version = "1.11", optional = true }
 # All paths are assumed to be utf-8 for ease of use and implementation
 camino = "1.1"
-# Allows calling crates to provide their own HTTP implementation, keep aligned with reqwest/hyper
+# Allows calling crates to provide their own HTTP implementation, try to keep aligned with reqwest/hyper/ureq etc
 http = "1.3"
 # Nicer scanning through bytes
 memchr = "2.5"

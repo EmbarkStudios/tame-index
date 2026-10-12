@@ -48,6 +48,21 @@ pub(crate) fn encode_hex<'out, const I: usize, const O: usize>(
     }
 }
 
+#[inline]
+pub(crate) fn compare_hex<const B: usize, const H: usize>(bytes: &[u8; B], hex: &[u8; H]) -> bool {
+    if B * 2 != H {
+        return false;
+    }
+
+    for (&b, h) in bytes.iter().zip(hex.chunks_exact(2)) {
+        if b >> 4 != h[0] || b & 0xf != h[1] {
+            return false;
+        }
+    }
+
+    true
+}
+
 /// The details for a remote url
 pub struct UrlDir {
     /// The unique directory name for the url

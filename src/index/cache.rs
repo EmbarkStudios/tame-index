@@ -49,8 +49,9 @@ pub struct ValidCacheEntry<'buffer> {
     ///
     /// For sparse indices, this will be an HTTP header from the response that
     /// was last written to disk, which is currently either `etag: <etag>` or
-    /// `last-modified: <timestamp>`
-    pub revision: &'buffer str,
+    /// `last-modified: <timestamp>`, or `Unknown` if an HTTP response was otherwise
+    /// valid but contained neither of those headers
+    pub revision: Revision<'buffer>,
     /// Portion of the buffer containing the individual version entries for the
     /// cache entry
     pub version_entries: &'buffer [u8],
@@ -98,6 +99,24 @@ impl<'buffer> ValidCacheEntry<'buffer> {
 
         let version_entries = &buffer[revision.len() + 1..];
 
+        let revision = if let Some((name, value)) = revision.split_once(": ") {
+            match name {
+                "etag" => Revision::Http(HttpRevision::Etag(value)),
+                "last-modified" => Revision::Http(HttpRevision::LastModified(value)),
+                _ => return Err(CacheError::InvalidCacheEntry),
+            }
+        } else {
+            if revision.len() == 40 && revision.chars().all(|c: char| c.is_ascii_hexdigit()) {
+                let mut r = [0u8; 40];
+                r.copy_from_slice(revision.as_bytes());
+                Revision::Git(GitRevision::Hex(crate::index::git::Sha1Hex::internal(r)))
+            } else if revision == UNKNOWN {
+                Revision::Unknown
+            } else {
+                return Err(CacheError::InvalidCacheEntry);
+            }
+        };
+
         Ok(Self {
             revision,
             version_entries,
@@ -108,9 +127,9 @@ impl<'buffer> ValidCacheEntry<'buffer> {
     ///
     /// If specified, the `revision` will be used to ignore cache entries
     /// that are outdated
-    pub fn to_krate(&self, revision: Option<&str>) -> Result<Option<IndexKrate>, Error> {
-        if let Some(iv) = revision {
-            if iv != self.revision {
+    pub fn to_krate(&self, revision: Option<Revision<'_>>) -> Result<Option<IndexKrate>, Error> {
+        if let Some(revision) = revision {
+            if revision != self.revision {
                 return Ok(None);
             }
         }
@@ -148,16 +167,81 @@ impl IndexKrate {
     pub fn write_cache_entry<W: std::io::Write>(
         &self,
         writer: &mut W,
-        revision: &str,
+        revision: &Revision<'_>,
     ) -> Result<(), std::io::Error> {
         use std::io::Write;
 
         const SPLIT: &[u8] = &[0];
 
-        let mut w = std::io::BufWriter::new(writer);
+        const PAGE_SIZE: usize = 4 * 1024;
+
+        /// std::io::BufWriter does a heap allocation for its scratch buffer, so just avoid that in favor
+        /// of a small stack buffer instead
+        struct StackWriter<'w, W> {
+            buf: [u8; PAGE_SIZE],
+            index: usize,
+            inner: &'w mut W,
+        }
+
+        impl<'w, W> StackWriter<'w, W>
+        where
+            W: std::io::Write,
+        {
+            fn new(inner: &'w mut W) -> Self {
+                Self {
+                    buf: [0u8; PAGE_SIZE],
+                    index: 0,
+                    inner,
+                }
+            }
+        }
+
+        impl<'w, W> std::io::Write for StackWriter<'w, W>
+        where
+            W: std::io::Write,
+        {
+            fn write(&mut self, mut buf: &[u8]) -> std::io::Result<usize> {
+                let len = buf.len();
+                let spare = PAGE_SIZE - self.index;
+                if len > spare {
+                    self.buf[self.index..].copy_from_slice(&buf[..spare]);
+                    buf = &buf[spare..];
+                    self.inner.write_all(&self.buf[..])?;
+                    self.index = 0;
+                }
+
+                if buf.len() >= PAGE_SIZE {
+                    let mut iter = buf.chunks_exact(PAGE_SIZE);
+
+                    for chunk in &mut iter {
+                        self.inner.write_all(chunk)?;
+                    }
+
+                    buf = iter.remainder();
+                }
+
+                if !buf.is_empty() {
+                    self.buf[self.index..self.index + buf.len()].copy_from_slice(buf);
+                    self.index += buf.len();
+                }
+
+                Ok(len)
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                if self.index > 0 {
+                    self.inner.write_all(&self.buf[..self.index])?;
+                    self.index = 0;
+                }
+
+                Ok(())
+            }
+        }
+
+        let mut w = StackWriter::new(writer);
         w.write_all(&[CURRENT_CACHE_VERSION])?;
         w.write_all(&INDEX_V_MAX_BYTES)?;
-        w.write_all(revision.as_bytes())?;
+        revision.write(&mut w)?;
         w.write_all(SPLIT)?;
 
         // crates.io limits crate names to a maximum of 64 characters, but this
@@ -208,6 +292,103 @@ pub fn split(haystack: &[u8], needle: u8) -> impl Iterator<Item = &[u8]> + '_ {
     Split { haystack, needle }
 }
 
+const ETAG: &str = "etag: ";
+const LAST_MODIFIED: &str = "last-modified: ";
+const UNKNOWN: &str = "Unknown";
+
+pub use crate::index::{git::GitRevision, sparse::HttpRevision};
+
+/// A cache entry revision
+pub enum Revision<'stack> {
+    /// An HTTP revision from either the `etag` or `last-modified` header value
+    Http(HttpRevision<'stack>),
+    /// A git revision, either a raw sha1 or a hex-encoded sha1 of the `HEAD` commit of the git registry
+    Git(GitRevision),
+    /// Unknown revision
+    Unknown,
+}
+
+impl Revision<'_> {
+    /// Writes this revision to the specified writer, in the same scheme as cargo
+    #[inline]
+    pub fn write(&self, w: &mut impl std::io::Write) -> std::io::Result<usize> {
+        let written = match self {
+            Self::Http(http) => match http {
+                HttpRevision::Etag(etag) => {
+                    w.write_all(ETAG.as_bytes())?;
+                    w.write_all(etag.as_bytes())?;
+                    ETAG.len() + etag.len()
+                }
+                HttpRevision::LastModified(lm) => {
+                    w.write_all(LAST_MODIFIED.as_bytes())?;
+                    w.write_all(lm.as_bytes())?;
+                    LAST_MODIFIED.len() + lm.len()
+                }
+            },
+            Self::Git(git) => match git {
+                GitRevision::Raw(sha1) => {
+                    let mut out = [0u8; 40];
+                    crate::utils::encode_hex(sha1, &mut out);
+                    w.write_all(&out)?;
+                    out.len()
+                }
+                GitRevision::Hex(sha1) => {
+                    w.write_all(sha1.as_ref())?;
+                    sha1.len()
+                }
+            },
+            Self::Unknown => {
+                w.write_all(UNKNOWN.as_bytes())?;
+                UNKNOWN.len()
+            }
+        };
+
+        Ok(written)
+    }
+}
+
+impl PartialEq for Revision<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Http(a), Self::Http(b)) => match (a, b) {
+                (HttpRevision::Etag(a), HttpRevision::Etag(b)) => a == b,
+                (HttpRevision::LastModified(a), HttpRevision::LastModified(b)) => a == b,
+                _ => false,
+            },
+            (Self::Git(a), Self::Git(b)) => a == b,
+            (Self::Unknown, Self::Unknown) => true,
+            _ => false,
+        }
+    }
+}
+
+use std::fmt;
+
+impl fmt::Debug for Revision<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Http(http) => {
+                let (n, v) = match http {
+                    HttpRevision::Etag(etag) => (ETAG, etag),
+                    HttpRevision::LastModified(lm) => (LAST_MODIFIED, lm),
+                };
+
+                f.write_str(n)?;
+                f.write_str(": ")?;
+                f.write_str(v)
+            }
+            Self::Git(git) => match git {
+                GitRevision::Hex(hex) => f.write_str(hex.as_ref()),
+                GitRevision::Raw(raw) => {
+                    let mut output = [0u8; 40];
+                    f.write_str(crate::utils::encode_hex(raw, &mut output))
+                }
+            },
+            Self::Unknown => f.write_str("Unknown"),
+        }
+    }
+}
+
 /// The [`IndexCache`] allows access to the local cache entries for a remote index
 ///
 /// This implementation does no network I/O whatsoever, but does do disk I/O
@@ -231,7 +412,7 @@ impl IndexCache {
     pub fn cached_krate(
         &self,
         name: KrateName<'_>,
-        revision: Option<&str>,
+        revision: Option<Revision<'_>>,
         lock: &FileLock,
     ) -> Result<Option<IndexKrate>, Error> {
         let Some(contents) = self.read_cache_file(name, lock)? else {
@@ -246,7 +427,7 @@ impl IndexCache {
     pub fn write_to_cache(
         &self,
         krate: &IndexKrate,
-        revision: &str,
+        revision: &Revision<'_>,
         _lock: &FileLock,
     ) -> Result<PathBuf, Error> {
         let name = krate.name().try_into()?;
