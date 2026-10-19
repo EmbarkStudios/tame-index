@@ -80,7 +80,7 @@ pub struct LocalRegistry {
 }
 
 impl LocalRegistry {
-    /// Opens an existing local registry, optionally validating it
+    /// Opens an existing local registry, optionally validating it if the `local-builder` feature is enabled
     pub fn open(mut path: PathBuf, _validate: bool) -> Result<Self, Error> {
         // There _should_ only be one directory in the root path, `index`
         path.push("index");

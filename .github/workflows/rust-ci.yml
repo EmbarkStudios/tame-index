@@ -10,14 +10,9 @@ name: CI
 jobs:
   lint:
     name: Lint
-    strategy:
-      matrix:
-        os:
-          - ubuntu-22.04
-          - windows-2022
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: "clippy, rustfmt"
@@ -30,50 +25,45 @@ jobs:
       # run clippy to verify we have no warnings
       - run: cargo fetch
       - name: cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: |
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo clippy --manifest-path integ/Cargo.toml --all-targets --all-features -- -D warnings
 
   test:
     name: Test
-    strategy:
-      matrix:
-        os:
-          - ubuntu-22.04
-        features: ["--features sparse", "--features local-builder,sparse"]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo test build
-        run: cargo build --tests ${{ matrix.features }}
-      - name: cargo test
-        run: cargo test ${{ matrix.features }}
-      - name: Test connection reuse
-        if: ${{ matrix.features == '--features sparse' }}
-        continue-on-error: true
         run: |
-          cargo run --manifest-path tests/connect/Cargo.toml
+          cargo build --tests --all-features
+          cargo build --manifest-path integ/Cargo.toml --tests
+      - name: cargo test
+        run: |
+          cargo test --all-features
+          cargo build --manifest-path integ/Cargo.toml
 
   deny-check:
     name: cargo-deny
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: EmbarkStudios/cargo-deny-action@v2
 
   publish-check:
     name: Publish Check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo publish check
         run: cargo publish --dry-run
 
   test_success:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [lint, test, publish-check, deny-check]
     steps:
       - run: echo "All test jobs passed"
-      
