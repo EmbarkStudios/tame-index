@@ -1,67 +1,126 @@
 //! Provides the various error types for this crate
 
+use std::{error::Error as StdErr, fmt};
+
 #[cfg(feature = "local-builder")]
 pub use crate::index::local::builder::LocalRegistryError;
 
 /// The core error type for this library
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum Error {
     /// Failed to deserialize a local cache entry
-    #[error(transparent)]
-    Cache(#[from] CacheError),
+    Cache(CacheError),
     /// This library assumes utf-8 paths in all cases, a path was provided that
     /// was not valid utf-8
-    #[error("unable to use non-utf8 path {:?}", .0)]
     NonUtf8Path(std::path::PathBuf),
     /// An environment variable was located, but had a non-utf8 value
-    #[error("environment variable {} has a non-utf8 value", .0)]
     NonUtf8EnvVar(std::borrow::Cow<'static, str>),
     /// A user-provided string was not a valid crate name
-    #[error(transparent)]
-    InvalidKrateName(#[from] InvalidKrateName),
+    InvalidKrateName(InvalidKrateName),
     /// The user specified a registry name that did not exist in any searched
     /// .cargo/config.toml
-    #[error("registry '{}' was not located in any .cargo/config.toml", .0)]
     UnknownRegistry(String),
     /// An I/O error
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+    Io(std::io::Error),
     /// An I/O error occurred trying to access a specific path
-    #[error("I/O operation failed for path '{}': {}", .1, .0)]
-    IoPath(#[source] std::io::Error, crate::PathBuf),
+    IoPath(std::io::Error, crate::PathBuf),
     /// A user provided URL was invalid
-    #[error(transparent)]
-    InvalidUrl(#[from] InvalidUrl),
+    InvalidUrl(InvalidUrl),
     /// Failed to de/serialize JSON
-    #[error(transparent)]
-    Json(#[from] serde_json::Error),
+    Json(serde_json::Error),
     /// Failed to deserialize TOML
-    #[error(transparent)]
-    Toml(#[from] Box<toml_span::Error>),
+    Toml(Box<toml_span::Error>),
     /// An index entry did not contain any versions
-    #[error("index entry contained no versions for the crate")]
     NoCrateVersions,
     /// Failed to handle an HTTP response or request
-    #[error(transparent)]
-    Http(#[from] HttpError),
+    Http(HttpError),
     /// Failed to parse a semver version or requirement
-    #[error(transparent)]
-    Semver(#[from] semver::Error),
+    Semver(semver::Error),
+    /// Failed to lock a file
+    Lock(FileLockError),
+    /// The entry from a remote index was invalid
+    InvalidJsonLines(InvalidJsonLines),
     /// A local registry is invalid
     #[cfg(feature = "local-builder")]
-    #[error(transparent)]
-    Local(#[from] LocalRegistryError),
-    /// Failed to lock a file
-    #[error(transparent)]
-    Lock(#[from] crate::utils::flock::FileLockError),
-    /// The entry from a remote index was invalid
-    #[error(transparent)]
-    InvalidRemoteEntry(#[from] InvalidRemoteEntry),
+    Local(LocalRegistryError),
 }
 
-impl From<std::path::PathBuf> for Error {
-    fn from(p: std::path::PathBuf) -> Self {
-        Self::NonUtf8Path(p)
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Cache(_) => f.write_str("cache error"),
+            Self::NonUtf8Path(p) => write!(f, "unable to use non-utf8 path {p:?}"),
+            Self::NonUtf8EnvVar(k) => write!(f, "environment variable '{k}' has a non-utf8 value"),
+            Self::InvalidKrateName(_) => f.write_str("invalid crate name"),
+            Self::UnknownRegistry(name) => write!(
+                f,
+                "registry '{name}' was not located in any .cargo/config.toml"
+            ),
+            Self::Io(_) | Self::IoPath(_, _) => f.write_str("I/O error"),
+            Self::InvalidUrl(_) => f.write_str("invalid url"),
+            Self::Json(_) => f.write_str("invalid JSON"),
+            Self::Toml(_) => f.write_str("invalid TOML"),
+            Self::NoCrateVersions => f.write_str("index entry contained no versions"),
+            Self::Http(_) => f.write_str("HTTP error"),
+            Self::Semver(_) => f.write_str("invalid semver"),
+            Self::Lock(_) => f.write_str("file lock error"),
+            Self::InvalidJsonLines(_) => f.write_str("invalid JSON lines"),
+            #[cfg(feature = "local-builder")]
+            Self::Local(_) => f.write_str("local registry error"),
+        }
+    }
+}
+
+impl StdErr for Error {
+    fn source(&self) -> Option<&(dyn StdErr + 'static)> {
+        match self {
+            Self::Cache(c) => Some(c),
+            Self::InvalidKrateName(ke) => Some(ke),
+            Self::Io(io) => Some(io),
+            Self::IoPath(io, _) => Some(io),
+            Self::InvalidUrl(iu) => Some(iu),
+            Self::Json(je) => Some(je),
+            Self::Toml(te) => Some(te),
+            Self::Http(he) => Some(he),
+            Self::Semver(se) => Some(se),
+            Self::Lock(le) => Some(le),
+            Self::InvalidJsonLines(ij) => Some(ij),
+            #[cfg(feature = "local-builder")]
+            Self::Local(lre) => Some(lre),
+            _ => None,
+        }
+    }
+}
+
+macro_rules! from {
+    ($k:ty, [$($v:ty => $m:ident),+$(,)?]) => {
+        $(
+            impl From<$v> for $k {
+                fn from(v: $v) -> Self {
+                    Self::$m(v)
+                }
+            }
+        )+
+    }
+}
+
+from!(Error, [
+    CacheError => Cache,
+    InvalidKrateName => InvalidKrateName,
+    std::path::PathBuf => NonUtf8Path,
+    std::io::Error => Io,
+    InvalidUrl => InvalidUrl,
+    serde_json::Error => Json,
+    HttpError => Http,
+    semver::Error => Semver,
+    FileLockError => Lock,
+    InvalidJsonLines => InvalidJsonLines,
+]);
+
+#[cfg(feature = "local-builder")]
+impl From<LocalRegistryError> for Error {
+    fn from(v: LocalRegistryError) -> Self {
+        Self::Local(v)
     }
 }
 
@@ -78,8 +137,8 @@ pub enum ReservedNameKind {
     Standard,
 }
 
-impl std::fmt::Display for ReservedNameKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for ReservedNameKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Keyword => f.write_str("rustlang keyword"),
             Self::Artifact => f.write_str("cargo artifact"),
@@ -90,13 +149,11 @@ impl std::fmt::Display for ReservedNameKind {
 }
 
 /// Errors that can occur when validating a crate name
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum InvalidKrateName {
     /// The name had an invalid length
-    #[error("crate name had an invalid length of '{0}'")]
     InvalidLength(usize),
     /// The name contained an invalid character
-    #[error("invalid character '{invalid}` @ {index}")]
     InvalidCharacter {
         /// The invalid character
         invalid: char,
@@ -104,7 +161,6 @@ pub enum InvalidKrateName {
         index: usize,
     },
     /// The name was one of the reserved names disallowed by cargo
-    #[error("the name '{reserved}' is reserved as '{kind}`")]
     ReservedName {
         /// The name that was reserved
         reserved: &'static str,
@@ -113,9 +169,28 @@ pub enum InvalidKrateName {
     },
 }
 
+impl fmt::Display for InvalidKrateName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLength(len) => write!(f, "crate name had an invalid length of '{len}'"),
+            Self::InvalidCharacter { invalid, index } => {
+                write!(f, "invalid character '{invalid}` @ {index}")
+            }
+            Self::ReservedName { reserved, kind } => {
+                write!(f, "the name '{reserved}' is reserved as '{kind}`")
+            }
+        }
+    }
+}
+
+impl StdErr for InvalidKrateName {
+    fn source(&self) -> Option<&(dyn StdErr + 'static)> {
+        None
+    }
+}
+
 /// An error pertaining to a bad URL provided to the API
-#[derive(Debug, thiserror::Error)]
-#[error("the url '{url}' is invalid")]
+#[derive(Debug)]
 pub struct InvalidUrl {
     /// The invalid url
     pub url: String,
@@ -123,57 +198,94 @@ pub struct InvalidUrl {
     pub source: InvalidUrlError,
 }
 
+impl fmt::Display for InvalidUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "the url '{}' is invalid", self.url)
+    }
+}
+
+impl StdErr for InvalidUrl {
+    fn source(&self) -> Option<&(dyn StdErr + 'static)> {
+        Some(&self.source)
+    }
+}
+
 /// The specific reason for the why the URL is invalid
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum InvalidUrlError {
     /// Sparse HTTP registry urls must be of the form `sparse+http(s)://`
-    #[error("sparse indices require the use of a url that starts with `sparse+http`")]
     MissingSparse,
     /// The `<modifier>+<scheme>://` is not supported
-    #[error("the scheme modifier is unknown")]
     UnknownSchemeModifier,
     /// Unable to find the `<scheme>://`
-    #[error("the scheme is missing")]
     MissingScheme,
     /// Attempted to construct a git index with a sparse URL
-    #[error("attempted to create a git index for a sparse URL")]
     SparseForGit,
 }
 
+impl fmt::Display for InvalidUrlError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingSparse => f.write_str(
+                "sparse indices require the use of a url that starts with `sparse+http`",
+            ),
+            Self::UnknownSchemeModifier => f.write_str("the scheme modifier is unknown"),
+            Self::MissingScheme => f.write_str("the scheme is missing"),
+            Self::SparseForGit => f.write_str("attempted to create a git index for a sparse URL"),
+        }
+    }
+}
+
+impl StdErr for InvalidUrlError {
+    fn source(&self) -> Option<&(dyn StdErr + 'static)> {
+        None
+    }
+}
+
 /// Errors related to a local index cache
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum CacheError {
     /// The cache entry is malformed
-    #[error("the cache entry is malformed")]
     InvalidCacheEntry,
     /// The cache version is old
-    #[error("the cache entry is an old, unsupported version")]
     OutdatedCacheVersion,
     /// The cache version is newer than the version supported by this crate
-    #[error("the cache entry is an unknown version, possibly written by a newer cargo version")]
     UnknownCacheVersion,
     /// The index version is newer than the version supported by this crate
-    #[error(
-        "the cache entry's index version is unknown, possibly written by a newer cargo version"
-    )]
     UnknownIndexVersion,
     /// The revision in the cache entry did match the requested revision
     ///
     /// This can occur when a git index is fetched and a newer revision is pulled
-    /// from the remote index, invalidating all local cache entries
-    #[error("the cache entry's revision does not match the current revision")]
+    /// from the remote index, invalidating all local cache entries6
     OutdatedRevision,
     /// A crate version in the cache file was malformed
-    #[error("a specific version in the cache entry is malformed")]
     InvalidCrateVersion,
 }
 
+impl fmt::Display for CacheError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidCacheEntry => f.write_str("the cache entry is malformed"),
+            Self::OutdatedCacheVersion => f.write_str("the cache entry is an old, unsupported version"),
+            Self::UnknownCacheVersion => f.write_str("the cache entry is an unknown version, possibly written by a newer cargo version"),
+            Self::UnknownIndexVersion => f.write_str("the cache entry's index version is unknown, possibly written by a newer cargo version"),
+            Self::OutdatedRevision => f.write_str("the cache entry's revision does not match the current revision"),
+            Self::InvalidCrateVersion => f.write_str("a specific version in the cache entry is malformed"),
+        }
+    }
+}
+
+impl StdErr for CacheError {
+    fn source(&self) -> Option<&(dyn StdErr + 'static)> {
+        None
+    }
+}
+
 /// Errors related to HTTP requests or responses
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum HttpError {
     /// A status code was received that indicates user error, or possibly a
     /// remote index that does not follow the protocol supported by this crate
-    #[error("status code '{code}': {msg}")]
     StatusCode {
         /// The status code
         code: http::StatusCode,
@@ -181,24 +293,128 @@ pub enum HttpError {
         msg: &'static str,
     },
     /// A [`http::Error`]
-    #[error(transparent)]
-    Http(#[from] http::Error),
+    Http(http::Error),
     /// A string could not be parsed as a valid header value
-    #[error(transparent)]
-    InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
-    /// Unable to complete an async request for an `AsyncRemoteSparseIndex` within
-    /// the user allotted time
-    #[error("request could not be completed in the allotted timeframe")]
-    Timeout,
+    InvalidHeaderValue(http::header::InvalidHeaderValue),
+}
+
+from!(HttpError, [
+    http::Error => Http,
+    http::header::InvalidHeaderValue => InvalidHeaderValue,
+]);
+
+impl fmt::Display for HttpError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StatusCode { code, msg } => write!(f, "status code '{code}': {msg}"),
+            Self::Http(_) => f.write_str("`http` error"),
+            Self::InvalidHeaderValue(_) => f.write_str("invalid header value"),
+        }
+    }
+}
+
+impl StdErr for HttpError {
+    fn source(&self) -> Option<&(dyn StdErr + 'static)> {
+        match self {
+            Self::Http(he) => Some(he),
+            Self::InvalidHeaderValue(ihv) => Some(ihv),
+            Self::StatusCode { .. } => None,
+        }
+    }
 }
 
 /// Errors when validating a remote index entry
-#[derive(Debug, thiserror::Error)]
-pub enum InvalidRemoteEntry {
+#[derive(Debug)]
+pub enum InvalidJsonLines {
     /// The entry for a crate was empty, every entry must have at least one published version to be valid
-    #[error("the remote entry was empty")]
     Empty,
     /// A specific line did not contain a JSON object
-    #[error("the remote entry had invalid JSON on line {0}")]
     NotJson(u32),
+}
+
+impl fmt::Display for InvalidJsonLines {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Empty => f.write_str("the entry was empty"),
+            Self::NotJson(i) => write!(f, "the entry had invalid JSON on line {i}"),
+        }
+    }
+}
+
+impl StdErr for InvalidJsonLines {
+    fn source(&self) -> Option<&(dyn StdErr + 'static)> {
+        None
+    }
+}
+
+/// An error pertaining to a failed file lock
+#[derive(Debug)]
+pub struct FileLockError {
+    /// The path of the file lock
+    pub path: crate::PathBuf,
+    /// The underlying failure reason
+    pub source: LockError,
+}
+
+impl fmt::Display for FileLockError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "failed to obtain lock file '{}'", self.path)
+    }
+}
+
+impl StdErr for FileLockError {
+    fn source(&self) -> Option<&(dyn StdErr + 'static)> {
+        Some(&self.source)
+    }
+}
+
+/// Errors that can occur when attempting to acquire a [`FileLock`]
+#[derive(Debug)]
+pub enum LockError {
+    /// An I/O error occurred attempting to open the lock file
+    Open(std::io::Error),
+    /// Exclusive locks cannot be take on read-only file systems
+    Readonly,
+    /// Failed to create parents directories to lock file
+    CreateDir(std::io::Error),
+    /// Locking is not supported if the lock file is on an NFS, though note this
+    /// is a bit more nuanced as `NFSv4` _does_ support file locking, but is out
+    /// of scope, at least for now
+    Nfs,
+    /// This could happen on eg. _extremely_ old and outdated OSes or some filesystems
+    /// and is only present for completeness
+    NotSupported,
+    /// An I/O error occurred attempting to un/lock the file
+    Lock(std::io::Error),
+    /// The lock could not be acquired within the caller provided timeout
+    TimedOut,
+    /// The lock is currently held by another process
+    Contested,
+}
+
+impl fmt::Display for LockError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Open(io) => write!(f, "{io}"),
+            Self::Readonly => {
+                f.write_str("attempted to take an exclusive lock on a read-only path")
+            }
+            Self::CreateDir(io) => {
+                write!(f, "failed to create parent directories for lock path: {io}")
+            }
+            Self::Nfs => f.write_str("NFS do not support locking"),
+            Self::NotSupported => {
+                f.write_str("locking is not supported on the filesystem and/or in the kernel")
+            }
+            Self::Lock(io) => write!(f, "failed to acquire or release file lock: {io}"),
+            Self::TimedOut => f.write_str("failed to acquire lock within the specified duration"),
+            Self::Contested => f.write_str("the lock is currently held by another process"),
+        }
+    }
+}
+
+impl StdErr for LockError {
+    fn source(&self) -> Option<&(dyn StdErr + 'static)> {
+        None
+    }
 }

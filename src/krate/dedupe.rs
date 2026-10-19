@@ -10,7 +10,38 @@ use std::{
     sync::Arc,
 };
 
-type XxSet<K> = std::collections::HashSet<K, BuildHasherDefault<twox_hash::XxHash64>>;
+pub struct FnvHasher(u64);
+
+impl Hasher for FnvHasher {
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        const PRIME: u64 = 0x0100_0000_01b3;
+
+        let Self(mut hash) = *self;
+
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(PRIME);
+        }
+
+        *self = Self(hash);
+    }
+}
+
+impl Default for FnvHasher {
+    fn default() -> Self {
+        const INITIAL_STATE: u64 = 0xcbf2_9ce4_8422_2325;
+
+        Self(INITIAL_STATE)
+    }
+}
+
+type XxSet<K> = std::collections::HashSet<K, BuildHasherDefault<FnvHasher>>;
 use super::FeatureMap;
 
 /// Many crate versions have the same features and dependencies
@@ -69,7 +100,7 @@ impl HashedFeatureMap {
     pub(crate) fn new(map: Arc<FeatureMap>) -> Self {
         let mut hash = 0;
         for (k, v) in map.iter() {
-            let mut hasher = twox_hash::XxHash64::default();
+            let mut hasher = FnvHasher::default();
             k.hash(&mut hasher);
             v.hash(&mut hasher);
             hash ^= hasher.finish(); // XOR makes it order-independent

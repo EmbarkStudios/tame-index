@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use tame_index::utils::flock;
+use tame_index::flock;
 
 fn main() {
     let mut args = std::env::args().skip(1);

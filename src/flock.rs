@@ -3,51 +3,11 @@
 use crate::{Error, Path, PathBuf};
 use std::{fs, time::Duration};
 
+pub use crate::error::{FileLockError, LockError};
+
 #[cfg_attr(unix, path = "flock/unix.rs")]
 #[cfg_attr(windows, path = "flock/windows.rs")]
 mod sys;
-
-/// An error pertaining to a failed file lock
-#[derive(Debug, thiserror::Error)]
-#[error("failed to obtain lock file '{path}'")]
-pub struct FileLockError {
-    /// The path of the file lock
-    pub path: PathBuf,
-    /// The underlying failure reason
-    pub source: LockError,
-}
-
-/// Errors that can occur when attempting to acquire a [`FileLock`]
-#[derive(Debug, thiserror::Error)]
-pub enum LockError {
-    /// An I/O error occurred attempting to open the lock file
-    #[error(transparent)]
-    Open(std::io::Error),
-    /// Exclusive locks cannot be take on read-only file systems
-    #[error("attempted to take an exclusive lock on a read-only path")]
-    Readonly,
-    /// Failed to create parents directories to lock file
-    #[error("failed to create parent directories for lock path")]
-    CreateDir(std::io::Error),
-    /// Locking is not supported if the lock file is on an NFS, though note this
-    /// is a bit more nuanced as `NFSv4` _does_ support file locking, but is out
-    /// of scope, at least for now
-    #[error("NFS do not support locking")]
-    Nfs,
-    /// This could happen on eg. _extremely_ old and outdated OSes or some filesystems
-    /// and is only present for completeness
-    #[error("locking is not supported on the filesystem and/or in the kernel")]
-    NotSupported,
-    /// An I/O error occurred attempting to un/lock the file
-    #[error("failed to acquire or release file lock")]
-    Lock(std::io::Error),
-    /// The lock could not be acquired within the caller provided timeout
-    #[error("failed to acquire lock within the specified duration")]
-    TimedOut,
-    /// The lock is currently held by another
-    #[error("the lock is currently held by another")]
-    Contested,
-}
 
 /// Provides options for creating a [`FileLock`]
 pub struct LockOptions<'pb> {

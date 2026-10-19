@@ -560,9 +560,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "smol_str",
- "thiserror",
  "toml-span",
- "twox-hash",
 ]
 
 [[package]]
@@ -606,12 +604,6 @@ checksum = "ac7807845e399906fbe4e7f57369d284d5bf102836423073290b7c01948dbda3"
 dependencies = [
  "smallvec",
 ]
-
-[[package]]
-name = "twox-hash"
-version = "2.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86a801b3cea342a06d468c8710662aa29e5e05e4f5c0d62f00bbb7f2ad7941c2"
 
 [[package]]
 name = "typenum"

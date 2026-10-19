@@ -1,7 +1,7 @@
 #[test]
 fn walks_entries() {
     const EXTRA_SPACES: &[u8] = include_bytes!("extra_spaces.json");
-    let lock = tame_index::utils::flock::FileLock::unlocked();
+    let lock = tame_index::flock::FileLock::unlocked();
 
     for ie in [
         tame_index::index::IndexEntry::Local(
