@@ -26,6 +26,35 @@ pub fn cargo_home() -> Result<crate::PathBuf, crate::Error> {
     Ok(crate::PathBuf::from_path_buf(chome)?)
 }
 
+/// A helper for memchr
+pub struct Split<'a> {
+    haystack: &'a [u8],
+    needle: u8,
+}
+
+impl<'a> Iterator for Split<'a> {
+    type Item = &'a [u8];
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a [u8]> {
+        if self.haystack.is_empty() {
+            return None;
+        }
+        let (ret, remaining) = match memchr::memchr(self.needle, self.haystack) {
+            Some(pos) => (&self.haystack[..pos], &self.haystack[pos + 1..]),
+            None => (self.haystack, &[][..]),
+        };
+        self.haystack = remaining;
+        Some(ret)
+    }
+}
+
+/// Gives an iterator over the specified buffer, where each item is split by the specified
+/// needle value
+pub fn split(haystack: &[u8], needle: u8) -> Split<'_> {
+    Split { haystack, needle }
+}
+
 /// Encodes a slice of bytes into a hexadecimal string to the specified buffer
 pub(crate) fn encode_hex<'out, const I: usize, const O: usize>(
     input: &[u8; I],
@@ -46,6 +75,21 @@ pub(crate) fn encode_hex<'out, const I: usize, const O: usize>(
     unsafe {
         std::str::from_utf8_unchecked(output)
     }
+}
+
+#[inline]
+pub(crate) fn compare_hex<const B: usize, const H: usize>(bytes: &[u8; B], hex: &[u8; H]) -> bool {
+    if B * 2 != H {
+        return false;
+    }
+
+    for (&b, h) in bytes.iter().zip(hex.chunks_exact(2)) {
+        if b >> 4 != h[0] || b & 0xf != h[1] {
+            return false;
+        }
+    }
+
+    true
 }
 
 /// The details for a remote url

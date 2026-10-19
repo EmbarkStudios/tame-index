@@ -1,0 +1,2 @@
+{"name": "crate-two", "vers": "0.1.0", "deps": [], "cksum": "d506c511495d1a0ded8cf08599097406a64afdf5b120281f628aa297ce1a0815", "features": {}, "yanked": true, "links": null}
+{"name": "crate-two", "vers": "0.2.0", "deps": [], "cksum": "9d84962ff0107e9c8161ea0b5c9bfc9d21862b4f82b9cf5083872a7c6c16d17f", "features": {}, "yanked": false, "links": null}

@@ -14,13 +14,13 @@ impl TempDir {
     }
 }
 
-impl Default for TempDir {
-    #[inline]
-    fn default() -> Self {
-        Self {
+#[macro_export]
+macro_rules! tempdir {
+    () => {
+        $crate::TempDir {
             td: tempfile::TempDir::new_in(env!("CARGO_TARGET_TMPDIR")).unwrap(),
         }
-    }
+    };
 }
 
 impl AsRef<Path> for TempDir {
@@ -41,11 +41,6 @@ impl<'td> From<&'td TempDir> for PathBuf {
     fn from(td: &'td TempDir) -> Self {
         td.path().to_owned()
     }
-}
-
-#[inline]
-pub fn tempdir() -> TempDir {
-    TempDir::default()
 }
 
 #[inline]
@@ -80,30 +75,9 @@ pub fn fake_krate(name: &str, num_versions: u8) -> IndexKrate {
     IndexKrate { versions }
 }
 
-#[cfg(feature = "sparse")]
-pub fn tls_config() -> rustls::ClientConfig {
-    let rcs: rustls::RootCertStore = webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect();
-    rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(
-        rustls::crypto::ring::default_provider(),
-    ))
-    .with_protocol_versions(rustls::DEFAULT_VERSIONS)
-    .unwrap()
-    .with_root_certificates(rcs)
-    .with_no_client_auth()
-}
-
-#[cfg(feature = "sparse")]
-pub fn blocking_client() -> reqwest::blocking::Client {
-    reqwest::blocking::Client::builder()
-        .tls_backend_preconfigured(tls_config())
-        .build()
-        .unwrap()
-}
-
-#[cfg(feature = "sparse")]
-pub fn async_client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .tls_backend_preconfigured(tls_config())
-        .build()
-        .unwrap()
+#[macro_export]
+macro_rules! kn {
+    ($n:literal) => {
+        tame_index::KrateName::from_static($n)
+    };
 }

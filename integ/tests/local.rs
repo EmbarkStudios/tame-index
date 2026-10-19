@@ -1,24 +1,52 @@
-#![allow(missing_docs)]
-#![cfg(all(feature = "local-builder", feature = "sparse"))]
-
-mod utils;
-
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use tame_index::index::local;
+use tame_index::{external::http, index::local::builder};
+
+fn unwrap_body(res: http::Response<ureq::Body>) -> tame_index::external::bytes::Bytes {
+    assert!(res.status().is_success());
+    res.into_body().read_to_vec().unwrap().into()
+}
+
+fn download<'iv>(
+    client: &ureq::Agent,
+    config: &tame_index::index::IndexConfig,
+    version: &'iv tame_index::IndexVersion,
+) -> builder::ValidKrate<'iv> {
+    let url = config.download_url(
+        version.name.as_str().try_into().unwrap(),
+        version.version.as_ref(),
+    );
+
+    let body = unwrap_body(client.get(url).call().unwrap());
+    builder::ValidKrate::validate(body, version).unwrap()
+}
 
 #[test]
+#[ignore = "this can take up to 5s to complete"]
 fn builds_local_registry() {
-    let sparse = tame_index::index::RemoteSparseIndex::new(
-        tame_index::SparseIndex::new(tame_index::IndexLocation::new(
-            tame_index::IndexUrl::CratesIoSparse,
-        ))
-        .unwrap(),
-        utils::blocking_client(),
-    );
+    let sparse = tame_index::SparseIndex::new(tame_index::IndexLocation::new(
+        tame_index::IndexUrl::CratesIoSparse,
+    ))
+    .unwrap();
 
     let mut mdc = cargo_metadata::MetadataCommand::new();
     mdc.features(cargo_metadata::CargoOpt::AllFeatures);
-    mdc.manifest_path("Cargo.toml");
+
+    let mp = {
+        let s = String::from_utf8(
+            std::process::Command::new("git")
+                .args(["rev-parse", "--show-toplevel"])
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .unwrap();
+
+        let mut s = s.trim().to_owned();
+        s.push_str("/Cargo.toml");
+        s
+    };
+
+    mdc.manifest_path(mp.clone());
     let md = mdc.exec().expect("failed to gather metadata");
 
     let mut krates = std::collections::BTreeMap::new();
@@ -28,15 +56,16 @@ fn builds_local_registry() {
         versions: Vec<smol_str::SmolStr>,
     }
 
-    let lock = tame_index::utils::flock::FileLock::unlocked();
+    let lock = &integ::unlocked();
 
     for pkg in &md.packages {
         if pkg.name.as_ref() == "tame-index" {
             continue;
         }
+
         let ip = krates.entry(pkg.name.clone()).or_insert_with(|| {
             let ik = sparse
-                .cached_krate(pkg.name.as_str().try_into().unwrap(), &lock)
+                .cached_krate(pkg.name.as_str().try_into().unwrap(), lock)
                 .map_err(|e| {
                     panic!("failed to read cache entry for {}: {e}", pkg.name);
                 })
@@ -47,7 +76,7 @@ fn builds_local_registry() {
                 .unwrap();
 
             IndexPkg {
-                ik,
+                ik: ik.deserialize().unwrap(),
                 versions: Vec::new(),
             }
         });
@@ -55,14 +84,11 @@ fn builds_local_registry() {
         ip.versions.push(pkg.version.to_string().into());
     }
 
-    let client = local::builder::Client::build(
-        reqwest::blocking::ClientBuilder::new().tls_backend_preconfigured(utils::tls_config()),
-    )
-    .unwrap();
+    let client = ureq::agent();
 
-    let lrb_td = utils::tempdir();
-    let lrb = local::LocalRegistryBuilder::create(lrb_td.path().to_owned()).unwrap();
-    let config = sparse.index.index_config().unwrap();
+    let lrb_td = integ::tempdir!();
+    let lrb = builder::LocalRegistryBuilder::create(lrb_td.path().to_owned()).unwrap();
+    let config = sparse.index_config().unwrap();
 
     krates.into_par_iter().for_each(|(_krate, ipkg)| {
         let mut crate_files = Vec::with_capacity(ipkg.versions.len());
@@ -76,7 +102,7 @@ fn builds_local_registry() {
                     .iter()
                     .find(|iv| iv.version == vers)
                     .unwrap();
-                local::ValidKrate::download(&client, &config, iv).unwrap()
+                download(&client, &config, iv)
             })
             .collect_into_vec(&mut crate_files);
 
@@ -87,7 +113,7 @@ fn builds_local_registry() {
 
     // Create a fake project and override the crates.io registry to point to
     // the local one we just created, it should get the same metadata
-    let fake_project = utils::tempdir();
+    let fake_project = integ::tempdir!();
 
     std::fs::copy("Cargo.toml", fake_project.path().join("Cargo.toml")).unwrap();
     std::fs::copy("Cargo.lock", fake_project.path().join("Cargo.lock")).unwrap();
@@ -123,7 +149,7 @@ local-registry = "{local_path}""#,
 
     let mut mdc = cargo_metadata::MetadataCommand::new();
     mdc.features(cargo_metadata::CargoOpt::AllFeatures);
-    mdc.manifest_path("Cargo.toml");
+    mdc.manifest_path(mp);
     // We need to override this otherwise our config won't be picked up
     mdc.current_dir(fake_project.path());
 
@@ -134,24 +160,15 @@ local-registry = "{local_path}""#,
 /// Validates we get the correct checksum for a crate
 #[test]
 fn downloads_and_verifies() {
-    let client = reqwest::blocking::Client::builder()
-        .tls_backend_preconfigured(utils::tls_config())
-        .no_gzip()
-        .build()
+    let res = ureq::get("https://static.crates.io/crates/wasm-bindgen/wasm-bindgen-0.2.87.crate")
+        .call()
         .unwrap();
 
-    let res = client
-        .get("https://static.crates.io/crates/wasm-bindgen/wasm-bindgen-0.2.87.crate")
-        .send()
-        .unwrap()
-        .error_for_status()
-        .unwrap();
+    let body = unwrap_body(res);
 
-    let body = res.bytes().unwrap();
-
-    use bytes::Buf;
+    use tame_index::external::bytes::Buf;
     assert!(
-        local::validate_checksum::<{ 16 * 1024 }>(
+        builder::validate_checksum::<{ 16 * 1024 }>(
             body.reader(),
             &("7706a72ab36d8cb1f80ffbf0e071533974a60d0a308d01a5d0375bf60499a342"
                 .parse()
@@ -204,8 +221,8 @@ local-registry = "test-local-registry"
         tame_index::index::ComboIndexCache::new(tame_index::IndexLocation::new(url)).unwrap();
     let lock = tame_index::utils::flock::FileLock::unlocked();
     let krate = index
-        .cached_krate("example-dependency".try_into().unwrap(), &lock)
+        .cached_krate(integ::kn!("example-dependency"), &lock)
         .unwrap()
         .unwrap();
-    assert_eq!("2.0.0", krate.versions[0].version);
+    assert_eq!(krate.iter().unwrap().next().unwrap().raw().0, "2.0.0");
 }

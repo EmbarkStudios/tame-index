@@ -1,8 +1,77 @@
-use super::{FileLock, IndexCache, cache::ValidCacheEntry};
-use crate::{Error, HttpError, IndexKrate, KrateName};
+//! Types and utilities for interacting with an [HTTP sparse indices](https://doc.rust-lang.org/cargo/reference/registry-index.html#sparse-protocol)
+
+use super::{FileLock, IndexCache, IndexEntry};
+use crate::{Error, HttpError, KrateName};
+use http::header::{self, HeaderName as Name, HeaderValue as Value};
 
 /// The default URL of the crates.io HTTP index
 pub const CRATES_IO_HTTP_INDEX: &str = "sparse+https://index.crates.io/";
+
+/// Revisions of index entries that can come from a sparse index
+pub enum HttpRevision<'stack> {
+    /// The contents of the [`etag`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag) header
+    Etag(&'stack str),
+    /// The contents of the [`last-modified`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Last-Modified) header
+    LastModified(&'stack str),
+}
+
+/// An HTTP request to a remote index for the metadata entry for a specific crate
+pub struct Request {
+    /// The url to send the request to
+    pub uri: String,
+    /// As of now this will always be `GET`
+    pub method: http::Method,
+    /// The headers to send when making the request
+    pub headers: [(Name, Value); 3],
+}
+
+#[allow(clippy::fallible_impl_from)]
+impl From<Request> for http::Request<()> {
+    fn from(value: Request) -> Self {
+        let mut r = http::Request::get(value.uri);
+
+        let hm = r.headers_mut().unwrap();
+
+        for (hn, hv) in value.headers {
+            hm.insert(hn, hv);
+        }
+
+        r.body(()).unwrap()
+    }
+}
+
+/// A bare response
+pub struct Response<'r> {
+    /// The [status code](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status)
+    pub status_code: http::StatusCode,
+    /// The revision to use for the response, currently either the `etag` or `last-modified` header values
+    pub revision: Option<HttpRevision<'r>>,
+    /// The full body, which should be in the JSON lines format
+    pub body: &'r [u8],
+}
+
+impl<'r, B> From<&'r http::Response<B>> for Response<'r>
+where
+    B: AsRef<[u8]>,
+{
+    fn from(value: &'r http::Response<B>) -> Self {
+        let hdrs = value.headers();
+
+        let revision = hdrs
+            .get(header::ETAG)
+            .and_then(|v| v.to_str().ok().map(HttpRevision::Etag))
+            .or_else(|| {
+                hdrs.get(header::LAST_MODIFIED)
+                    .and_then(|v| v.to_str().ok().map(HttpRevision::LastModified))
+            });
+
+        Self {
+            status_code: value.status(),
+            revision,
+            body: value.body().as_ref(),
+        }
+    }
+}
 
 /// Wrapper around managing a sparse HTTP index, re-using Cargo's local disk caches.
 ///
@@ -72,18 +141,18 @@ impl SparseIndex {
 
     /// Attempts to read the locally cached crate information
     #[inline]
-    pub fn cached_krate(
+    pub fn cached_krate<'r, 'l>(
         &self,
         name: KrateName<'_>,
-        lock: &FileLock,
-    ) -> Result<Option<IndexKrate>, Error> {
-        self.cache.cached_krate(name, None, lock)
+        lock: &'l FileLock,
+    ) -> Result<Option<crate::index::IndexEntry<'r, 'l>>, Error> {
+        self.cache.cached_krate(name, lock)
     }
 
     /// Creates an HTTP request that can be sent via your HTTP client of choice
     /// to retrieve the current metadata for the specified crate
     ///
-    /// If specified, the etag is used instead of the possible etag stored in
+    /// If specified, the revision is used instead of the possible revision stored in
     /// a local cache entry, resulting in no disk I/O being performed by this
     /// method
     ///
@@ -95,37 +164,23 @@ impl SparseIndex {
     pub fn make_remote_request(
         &self,
         name: KrateName<'_>,
-        etag: Option<&str>,
+        revision: Option<HttpRevision<'_>>,
         lock: &FileLock,
-    ) -> Result<http::Request<()>, Error> {
-        use http::header;
+    ) -> Result<Request, Error> {
+        let uri = self.crate_url(name);
 
-        let url = self.crate_url(name);
+        // AFAICT this does not affect responses at the moment, but could in
+        // the future if there are changes to the protocol
+        const CARGO_PROTOCOL: (Name, Value) = (
+            Name::from_static("cargo-protocol"),
+            Value::from_static("version=1"),
+        );
+        // All index entries are just files with lines of JSON
+        const ACCEPT: (Name, Value) = (header::ACCEPT, Value::from_static("text/plain"));
+        // It's fine to send an empty etag that will always miss if we can't get the etag/last-modified from disk
+        const UNKNOWN_CACHE: (Name, Value) = (header::IF_NONE_MATCH, Value::from_static(""));
 
-        let mut req = http::Request::get(url);
-
-        {
-            let headers = req.headers_mut().unwrap();
-
-            // AFAICT this does not affect responses at the moment, but could in
-            // the future if there are changes to the protocol
-            headers.insert(
-                "cargo-protocol",
-                header::HeaderValue::from_static("version=1"),
-            );
-            // All index entries are just files with lines of JSON
-            headers.insert(
-                header::ACCEPT,
-                header::HeaderValue::from_static("text/plain"),
-            );
-            // We need to accept both identity and gzip, as otherwise cloudfront will
-            // always respond to requests with strong etag's, which will differ from
-            // cache entries generated by cargo
-            headers.insert(
-                header::ACCEPT_ENCODING,
-                header::HeaderValue::from_static("gzip"),
-            );
-
+        let cache = {
             // If we have a local cache entry, include its version with the
             // appropriate header, this allows the server to respond with a
             // cached, or even better, empty response if its version matches
@@ -133,16 +188,17 @@ impl SparseIndex {
 
             // If we're unable to get the cache version we can just ignore setting the
             // header, guaranteeing we'll get the full index contents if the crate exists
-            let set_cache_version = |headers: &mut header::HeaderMap| -> Option<()> {
+            let set_cache_version = || -> Option<(header::HeaderName, header::HeaderValue)> {
                 let contents = self.cache.read_cache_file(name, lock).ok()??;
-                let valid = ValidCacheEntry::read(&contents).ok()?;
+                let revision = contents.cached().ok().and_then(|c| c.map(|c| c.revision))?;
 
-                let (key, value) = valid.revision.split_once(':')?;
-                let value = header::HeaderValue::from_str(value.trim()).ok()?;
-                let name = if key == header::ETAG {
-                    header::IF_NONE_MATCH
-                } else if key == header::LAST_MODIFIED {
-                    header::IF_MODIFIED_SINCE
+                let (name, value) = if let crate::index::cache::Revision::Http(http) = revision {
+                    match http {
+                        HttpRevision::Etag(value) => (header::IF_NONE_MATCH, value.trim()),
+                        HttpRevision::LastModified(value) => {
+                            (header::IF_MODIFIED_SINCE, value.trim())
+                        }
+                    }
                 } else {
                     // We could error here, but that's kind of pointless
                     // since the response will be sent in full if we haven't
@@ -151,22 +207,31 @@ impl SparseIndex {
                     return None;
                 };
 
-                headers.insert(name, value);
-                None
+                Some((name, header::HeaderValue::from_str(value.trim()).ok()?))
             };
 
-            if let Some(etag) = etag {
+            if let Some(rev) = revision {
+                let (name, value) = match rev {
+                    HttpRevision::Etag(etag) => (header::IF_NONE_MATCH, etag),
+                    HttpRevision::LastModified(lm) => (header::IF_MODIFIED_SINCE, lm),
+                };
+
                 let hv =
-                    header::HeaderValue::from_str(etag.trim()).map_err(crate::HttpError::from)?;
-                headers.insert(header::IF_NONE_MATCH, hv);
+                    header::HeaderValue::from_str(value.trim()).map_err(crate::HttpError::from)?;
+
+                (name, hv)
             } else {
                 // Use the etag (or last modified, though crates.io does not use this AFAICT)
                 // from the cache entry if it exists
-                let _ = set_cache_version(headers);
+                set_cache_version().unwrap_or(UNKNOWN_CACHE)
             }
-        }
+        };
 
-        Ok(req.body(()).unwrap())
+        Ok(Request {
+            uri,
+            headers: [CARGO_PROTOCOL, ACCEPT, cache],
+            method: http::Method::GET,
+        })
     }
 
     /// Process the response to a request created by [`Self::make_remote_request`]
@@ -177,52 +242,41 @@ impl SparseIndex {
     ///
     /// You may specify whether an updated index entry is written locally to the
     /// cache or not
-    ///
-    /// Note that responses from sparse HTTP indices, at least crates.io, may
-    /// send responses with `gzip` compression, it is your responsibility to
-    /// decompress it before sending to this function
-    pub fn parse_remote_response(
+    pub fn parse_remote_response<'r, 'l>(
         &self,
         name: KrateName<'_>,
-        response: http::Response<Vec<u8>>,
+        response: impl Into<Response<'r>>,
         write_cache_entry: bool,
-        lock: &FileLock,
-    ) -> Result<Option<IndexKrate>, Error> {
-        use http::{StatusCode, header};
-        let (parts, body) = response.into_parts();
+        lock: &'l FileLock,
+    ) -> Result<Option<crate::index::IndexEntry<'r, 'l>>, Error> {
+        use http::StatusCode;
+        let response = response.into();
 
-        match parts.status {
+        match response.status_code {
             // The server responded with the full contents of the index entry
             StatusCode::OK => {
-                let krate = IndexKrate::from_slice(&body)?;
+                let entry = crate::index::JsonLines::validate(response.body)?;
 
                 if write_cache_entry {
-                    // The same as cargo, prefer etag over last-modified
-                    let version = if let Some(etag) = parts.headers.get(header::ETAG) {
-                        etag.to_str()
-                            .ok()
-                            .map(|etag| format!("{}: {etag}", header::ETAG))
-                    } else if let Some(lm) = parts.headers.get(header::LAST_MODIFIED) {
-                        lm.to_str()
-                            .ok()
-                            .map(|lm| format!("{}: {lm}", header::LAST_MODIFIED))
-                    } else {
-                        None
-                    };
-
-                    let revision = version.unwrap_or_else(|| "Unknown".to_owned());
-
                     // It's unfortunate if we can't write to the cache, but we
                     // don't treat it as a hard error since we still have the
                     // index metadata
-                    let _err = self.cache.write_to_cache(&krate, &revision, lock);
+                    let _err = self.cache.write_to_cache(
+                        name,
+                        entry,
+                        &response.revision.map_or(
+                            crate::index::cache::Revision::Unknown,
+                            crate::index::cache::Revision::Http,
+                        ),
+                        lock,
+                    );
                 }
 
-                Ok(Some(krate))
+                Ok(Some(crate::index::IndexEntry::Remote(entry)))
             }
             // The local cache entry is up to date with the latest entry on the
             // server, we can just return the local one
-            StatusCode::NOT_MODIFIED => self.cache.cached_krate(name, None, lock),
+            StatusCode::NOT_MODIFIED => self.cache.cached_krate(name, lock),
             // The server requires authorization but the user didn't provide it
             StatusCode::UNAUTHORIZED => Err(HttpError::StatusCode {
                 code: StatusCode::UNAUTHORIZED,
@@ -239,5 +293,62 @@ impl SparseIndex {
             }
             .into()),
         }
+    }
+}
+
+/// A utility that can be used to wrap remote requests/responses that caches the etag to avoid disk I/O
+pub struct EtagCache {
+    cache: Vec<(smol_str::SmolStr, String)>,
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for EtagCache {
+    fn default() -> Self {
+        Self { cache: Vec::new() }
+    }
+}
+
+impl EtagCache {
+    /// The same as [`SparseIndex::parse_remote_response`] except a cached `etag` is used if one has been cached for this
+    /// crate previously
+    #[inline]
+    pub fn make_remote_request(
+        &self,
+        index: &SparseIndex,
+        name: KrateName<'_>,
+        lock: &FileLock,
+    ) -> Result<Request, Error> {
+        let etag = self
+            .cache
+            .binary_search_by_key(&name.0, |(kn, _)| kn.as_str())
+            .ok()
+            .map(|i| self.cache[i].1.as_str());
+
+        index.make_remote_request(name, etag.map(HttpRevision::Etag), lock)
+    }
+
+    /// The same as [`SparseIndex::parse_remote_response`], except the `etag` is cached for any subsequent responses
+    #[inline]
+    pub fn parse_remote_response<'r, 'l>(
+        &mut self,
+        index: &SparseIndex,
+        name: KrateName<'_>,
+        response: impl Into<Response<'r>>,
+        write_cache_entry: bool,
+        lock: &'l FileLock,
+    ) -> Result<Option<IndexEntry<'r, 'l>>, Error> {
+        let response = response.into();
+        if let Some(HttpRevision::Etag(etag)) = &response.revision {
+            let etag = (*etag).to_owned();
+            match self
+                .cache
+                .binary_search_by_key(&name.0, |(krate, _)| krate.as_str())
+            {
+                Ok(i) => self.cache[i].1 = etag,
+                Err(i) => self.cache.insert(i, (name.0.into(), etag)),
+            }
+        }
+
+        index.parse_remote_response(name, response, write_cache_entry, lock)
     }
 }

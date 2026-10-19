@@ -1,8 +1,69 @@
+//! Types and utilities for interacting with [git registry indices](https://doc.rust-lang.org/cargo/reference/registry-index.html#git-protocol)
+
 use super::{FileLock, IndexCache};
-use crate::{Error, IndexKrate, KrateName, PathBuf};
+use crate::{Error, IndexKrate, KrateName, PathBuf, utils};
 
 /// The URL of the crates.io index for use with git
 pub const CRATES_IO_INDEX: &str = "https://github.com/rust-lang/crates.io-index";
+
+/// A 40-byte hex string
+pub type HexBytes = [u8; 40];
+
+/// Hex encoded sha1
+#[derive(Copy, Clone)]
+pub struct Sha1Hex(HexBytes);
+
+impl Sha1Hex {
+    #[inline]
+    pub(crate) fn internal(v: HexBytes) -> Self {
+        Self(v)
+    }
+
+    pub(crate) fn empty() -> Self {
+        Self([0u8; _])
+    }
+}
+
+impl AsRef<[u8]> for Sha1Hex {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<str> for Sha1Hex {
+    #[allow(unsafe_code)]
+    fn as_ref(&self) -> &str {
+        // SAFETY: we only allow conversion via encode_hex which only writes hex digits
+        unsafe { std::str::from_utf8_unchecked(&self.0) }
+    }
+}
+
+impl From<[u8; 20]> for Sha1Hex {
+    fn from(value: [u8; 20]) -> Self {
+        let mut hex = Self::empty();
+        utils::encode_hex(&value, &mut hex.0);
+        hex
+    }
+}
+
+/// Revision that can come from a git registry index
+pub enum GitRevision {
+    /// The raw 20-byte SHA1 of a git revision
+    Raw([u8; 20]),
+    /// The 40-byte hex string representation of a 20-byte SHA1 of a git revision
+    Hex(Sha1Hex),
+}
+
+impl PartialEq for GitRevision {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Raw(a), Self::Raw(b)) => a == b,
+            (Self::Hex(a), Self::Hex(b)) => a.0 == b.0,
+            (Self::Raw(a), Self::Hex(b)) => utils::compare_hex(a, &b.0),
+            (Self::Hex(a), Self::Raw(b)) => utils::compare_hex(b, &a.0),
+        }
+    }
+}
 
 /// Allows access to a cargo git registry index
 ///
@@ -12,7 +73,7 @@ pub struct GitIndex {
     #[allow(dead_code)]
     pub(super) url: String,
     /// The sha-1 head commit id encoded as hex
-    pub head: Option<[u8; 40]>,
+    pub head: Option<Sha1Hex>,
 }
 
 impl GitIndex {
@@ -40,25 +101,13 @@ impl GitIndex {
     /// If set, this will be used to disregard cache entries that do not match
     #[inline]
     pub fn set_head_commit(&mut self, commit_id: Option<[u8; 20]>) {
-        if let Some(id) = &commit_id {
-            let mut hex_head = [0u8; 40];
-            crate::utils::encode_hex(id, &mut hex_head);
-            self.head = Some(hex_head);
-        } else {
-            self.head = None;
-        }
+        self.head = commit_id.map(Sha1Hex::from);
     }
 
     /// Gets the hex-encoded sha-1 id for the head commit
     #[inline]
-    pub fn head_commit(&self) -> Option<&str> {
-        self.head.as_ref().map(|hc| {
-            // SAFETY: the buffer is always ASCII hex
-            #[allow(unsafe_code)]
-            unsafe {
-                std::str::from_utf8_unchecked(hc)
-            }
-        })
+    pub fn head_commit(&self) -> Option<&Sha1Hex> {
+        self.head.as_ref()
     }
 
     /// Reads a crate from the local cache of the index.
@@ -66,12 +115,12 @@ impl GitIndex {
     /// There are no guarantees around freshness, and no network I/O will be
     /// performed.
     #[inline]
-    pub fn cached_krate(
+    pub fn cached_krate<'l>(
         &self,
         name: KrateName<'_>,
-        lock: &FileLock,
-    ) -> Result<Option<IndexKrate>, Error> {
-        self.cache.cached_krate(name, self.head_commit(), lock)
+        lock: &'l FileLock,
+    ) -> Result<Option<crate::index::IndexEntry<'_, 'l>>, Error> {
+        self.cache.cached_krate(name, lock)
     }
 
     /// Writes the specified crate to the cache.
@@ -82,12 +131,20 @@ impl GitIndex {
     pub fn write_to_cache(
         &self,
         krate: &IndexKrate,
-        blob_id: Option<&str>,
+        blob_id: Option<Sha1Hex>,
         lock: &FileLock,
     ) -> Result<Option<PathBuf>, Error> {
-        let Some(id) = blob_id.or_else(|| self.head_commit()) else {
+        let Some(id) = blob_id.or_else(|| self.head_commit().copied()) else {
             return Ok(None);
         };
-        self.cache.write_to_cache(krate, id, lock).map(Some)
+
+        self.cache
+            .write_to_cache(
+                krate.name().try_into()?,
+                super::cache::CacheWrite::Krate(krate),
+                &crate::index::cache::Revision::Git(GitRevision::Hex(id)),
+                lock,
+            )
+            .map(Some)
     }
 }
