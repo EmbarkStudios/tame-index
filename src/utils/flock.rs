@@ -282,7 +282,7 @@ impl FileLock {
     ///
     /// This allows for easy testing or use in situations where you don't care
     /// about file locking, or have other ways to ensure something is uncontested
-    pub fn unlocked() -> Self {
+    pub const fn unlocked() -> Self {
         Self {
             file: None,
             state: LockState::Unlocked,

@@ -87,7 +87,7 @@ impl<'buffer> ValidCacheEntry<'buffer> {
 
         buffer = &buffer[4..];
 
-        let mut iter = split(buffer, 0);
+        let mut iter = crate::utils::split(buffer, 0);
         let revision = std::str::from_utf8(iter.next().ok_or(CacheError::InvalidCacheEntry)?)
             .map_err(|_e| CacheError::OutdatedRevision)?;
 
@@ -134,7 +134,7 @@ impl<'buffer> ValidCacheEntry<'buffer> {
             }
         }
 
-        Ok(Some(IndexKrate::from_cache(split(
+        Ok(Some(IndexKrate::from_cache(crate::utils::split(
             self.version_entries,
             0,
         ))?))
@@ -159,137 +159,6 @@ impl IndexKrate {
 
         Ok(Self { versions })
     }
-
-    /// Writes a cache entry with the specified revision to an [`std::io::Write`]
-    ///
-    /// Note this method creates its own internal [`std::io::BufWriter`], there
-    /// is no need to wrap it yourself
-    pub fn write_cache_entry<W: std::io::Write>(
-        &self,
-        writer: &mut W,
-        revision: &Revision<'_>,
-    ) -> Result<(), std::io::Error> {
-        use std::io::Write;
-
-        const SPLIT: &[u8] = &[0];
-
-        const PAGE_SIZE: usize = 4 * 1024;
-
-        /// `std::io::BufWriter` does a heap allocation for its scratch buffer, so just avoid that in favor
-        /// of a small stack buffer instead
-        struct StackWriter<'w, W> {
-            buf: [u8; PAGE_SIZE],
-            index: usize,
-            inner: &'w mut W,
-        }
-
-        impl<'w, W> StackWriter<'w, W>
-        where
-            W: std::io::Write,
-        {
-            fn new(inner: &'w mut W) -> Self {
-                Self {
-                    buf: [0u8; PAGE_SIZE],
-                    index: 0,
-                    inner,
-                }
-            }
-        }
-
-        impl<'w, W> std::io::Write for StackWriter<'w, W>
-        where
-            W: std::io::Write,
-        {
-            fn write(&mut self, mut buf: &[u8]) -> std::io::Result<usize> {
-                let len = buf.len();
-                let spare = PAGE_SIZE - self.index;
-                if len > spare {
-                    self.buf[self.index..].copy_from_slice(&buf[..spare]);
-                    buf = &buf[spare..];
-                    self.inner.write_all(&self.buf[..])?;
-                    self.index = 0;
-                }
-
-                if buf.len() >= PAGE_SIZE {
-                    let mut iter = buf.chunks_exact(PAGE_SIZE);
-
-                    for chunk in &mut iter {
-                        self.inner.write_all(chunk)?;
-                    }
-
-                    buf = iter.remainder();
-                }
-
-                if !buf.is_empty() {
-                    self.buf[self.index..self.index + buf.len()].copy_from_slice(buf);
-                    self.index += buf.len();
-                }
-
-                Ok(len)
-            }
-
-            fn flush(&mut self) -> std::io::Result<()> {
-                if self.index > 0 {
-                    self.inner.write_all(&self.buf[..self.index])?;
-                    self.index = 0;
-                }
-
-                Ok(())
-            }
-        }
-
-        let mut w = StackWriter::new(writer);
-        w.write_all(&[CURRENT_CACHE_VERSION])?;
-        w.write_all(&INDEX_V_MAX_BYTES)?;
-        revision.write(&mut w)?;
-        w.write_all(SPLIT)?;
-
-        // crates.io limits crate names to a maximum of 64 characters, but this
-        // only applies to crates.io and not any cargo index, so don't set a hard
-        // limit
-        let mut semver = String::with_capacity(64);
-
-        for iv in &self.versions {
-            semver.clear();
-            // SAFETY: the only way this would fail would be OOM
-            std::fmt::write(&mut semver, format_args!("{}", iv.version)).unwrap();
-            w.write_all(semver.as_bytes())?;
-            w.write_all(SPLIT)?;
-
-            serde_json::to_writer(&mut w, &iv)?;
-            w.write_all(SPLIT)?;
-        }
-
-        w.flush()
-    }
-}
-
-/// Gives an iterator over the specified buffer, where each item is split by the specified
-/// needle value
-pub fn split(haystack: &[u8], needle: u8) -> impl Iterator<Item = &[u8]> + '_ {
-    struct Split<'a> {
-        haystack: &'a [u8],
-        needle: u8,
-    }
-
-    impl<'a> Iterator for Split<'a> {
-        type Item = &'a [u8];
-
-        #[inline]
-        fn next(&mut self) -> Option<&'a [u8]> {
-            if self.haystack.is_empty() {
-                return None;
-            }
-            let (ret, remaining) = match memchr::memchr(self.needle, self.haystack) {
-                Some(pos) => (&self.haystack[..pos], &self.haystack[pos + 1..]),
-                None => (self.haystack, &[][..]),
-            };
-            self.haystack = remaining;
-            Some(ret)
-        }
-    }
-
-    Split { haystack, needle }
 }
 
 const ETAG: &str = "etag: ";
@@ -406,33 +275,24 @@ impl IndexCache {
     }
 
     /// Reads a crate from the local cache of the index.
-    ///
-    /// You may optionally pass in the revision the cache entry is expected to
-    /// have, if it does match the cache entry will be ignored and an error returned
     #[inline]
-    pub fn cached_krate(
+    pub fn cached_krate<'r, 'l>(
         &self,
         name: KrateName<'_>,
-        revision: Option<Revision<'_>>,
-        lock: &FileLock,
-    ) -> Result<Option<IndexKrate>, Error> {
-        let Some(contents) = self.read_cache_file(name, lock)? else {
-            return Ok(None);
-        };
-
-        let valid = ValidCacheEntry::read(&contents)?;
-        valid.to_krate(revision)
+        lock: &'l FileLock,
+    ) -> Result<Option<crate::index::IndexEntry<'r, 'l>>, Error> {
+        self.read_cache_file(name, lock)
     }
 
     /// Writes the specified crate and revision to the cache
-    pub fn write_to_cache(
+    pub fn write_to_cache<'w>(
         &self,
-        krate: &IndexKrate,
+        krate: KrateName<'_>,
+        cw: impl Into<CacheWrite<'w>>,
         revision: &Revision<'_>,
         _lock: &FileLock,
     ) -> Result<PathBuf, Error> {
-        let name = krate.name().try_into()?;
-        let cache_path = self.cache_path(name);
+        let cache_path = self.cache_path(krate);
 
         std::fs::create_dir_all(cache_path.parent().unwrap())?;
 
@@ -444,7 +304,7 @@ impl IndexCache {
         // It's unfortunate if this fails for some reason, but
         // not writing the cache entry shouldn't stop the user
         // from getting the crate's metadata
-        match krate.write_cache_entry(&mut cache_file, revision) {
+        match cw.into().write_cache_entry(&mut cache_file, revision) {
             Ok(_) => Ok(cache_path),
             Err(err) => {
                 drop(cache_file);
@@ -473,17 +333,167 @@ impl IndexCache {
     ///
     /// It is recommended to use [`Self::cached_krate`]
     #[inline]
-    pub fn read_cache_file(
+    #[allow(unsafe_code)]
+    pub fn read_cache_file<'r, 'l>(
         &self,
         name: KrateName<'_>,
-        _lock: &FileLock,
-    ) -> Result<Option<Vec<u8>>, Error> {
+        lock: &'l FileLock,
+    ) -> Result<Option<crate::index::IndexEntry<'r, 'l>>, Error> {
         let cache_path = self.cache_path(name);
 
-        match std::fs::read(&cache_path) {
-            Ok(cb) => Ok(Some(cb)),
+        match super::LockedMmap::mmap(&cache_path, lock) {
+            Ok(mmap) => Ok(Some(crate::index::IndexEntry::Cache(mmap))),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(err) => Err(Error::IoPath(err, cache_path)),
         }
+    }
+}
+
+/// A write to the cache
+pub enum CacheWrite<'r> {
+    /// An index entry from a remote source, JSON separated by newlines
+    Remote(crate::index::JsonLines<'r>),
+    /// An [`IndexKrate`], each version is serialized individually
+    Krate(&'r IndexKrate),
+}
+
+impl CacheWrite<'_> {
+    /// Writes a cache entry with the specified revision to an [`std::io::Write`]
+    ///
+    /// Note this method creates its own internal [`std::io::BufWriter`], there
+    /// is no need to wrap it yourself
+    pub fn write_cache_entry<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+        revision: &Revision<'_>,
+    ) -> Result<usize, std::io::Error> {
+        use std::io::Write;
+
+        const SPLIT: &[u8] = &[0];
+
+        const PAGE_SIZE: usize = 4 * 1024;
+
+        /// `std::io::BufWriter` does a heap allocation for its scratch buffer, so just avoid that in favor
+        /// of a small stack buffer instead
+        struct StackWriter<'w, W> {
+            buf: [u8; PAGE_SIZE],
+            index: usize,
+            total: usize,
+            inner: &'w mut W,
+        }
+
+        impl<'w, W> StackWriter<'w, W>
+        where
+            W: Write,
+        {
+            fn new(inner: &'w mut W) -> Self {
+                Self {
+                    buf: [0u8; PAGE_SIZE],
+                    index: 0,
+                    total: 0,
+                    inner,
+                }
+            }
+
+            #[inline]
+            fn inner_write(w: &mut W, total: &mut usize, buf: &[u8]) -> std::io::Result<()> {
+                w.write_all(buf)?;
+                *total += buf.len();
+                Ok(())
+            }
+        }
+
+        impl<'w, W> Write for StackWriter<'w, W>
+        where
+            W: Write,
+        {
+            fn write(&mut self, mut buf: &[u8]) -> std::io::Result<usize> {
+                let len = buf.len();
+                let spare = PAGE_SIZE - self.index;
+                if len > spare {
+                    self.buf[self.index..].copy_from_slice(&buf[..spare]);
+                    buf = &buf[spare..];
+                    Self::inner_write(self.inner, &mut self.total, &self.buf[..])?;
+                    self.index = 0;
+                }
+
+                if buf.len() >= PAGE_SIZE {
+                    let mut iter = buf.chunks_exact(PAGE_SIZE);
+
+                    for chunk in &mut iter {
+                        Self::inner_write(self.inner, &mut self.total, chunk)?;
+                    }
+
+                    buf = iter.remainder();
+                }
+
+                if !buf.is_empty() {
+                    self.buf[self.index..self.index + buf.len()].copy_from_slice(buf);
+                    self.index += buf.len();
+                }
+
+                Ok(len)
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                if self.index > 0 {
+                    Self::inner_write(self.inner, &mut self.total, &self.buf[..self.index])?;
+                    self.index = 0;
+                }
+
+                Ok(())
+            }
+        }
+
+        let mut w = StackWriter::new(writer);
+        w.write_all(&[CURRENT_CACHE_VERSION])?;
+        w.write_all(&INDEX_V_MAX_BYTES)?;
+        revision.write(&mut w)?;
+        w.write_all(SPLIT)?;
+
+        match self {
+            Self::Remote(r) => {
+                for entry in super::IndexEntryIter::Remote(crate::utils::split(r.0, b'\n')) {
+                    let (vs, json) = entry.raw();
+
+                    w.write_all(vs.as_bytes())?;
+                    w.write_all(SPLIT)?;
+
+                    w.write_all(json)?;
+                    w.write_all(SPLIT)?;
+                }
+            }
+            Self::Krate(k) => {
+                // crates.io limits crate names to a maximum of 64 characters, but this
+                // only applies to crates.io and not any cargo index, so don't set a hard
+                // limit
+                let mut semver = String::with_capacity(64);
+
+                for iv in &k.versions {
+                    semver.clear();
+                    // SAFETY: the only way this would fail would be OOM
+                    std::fmt::write(&mut semver, format_args!("{}", iv.version)).unwrap();
+                    w.write_all(semver.as_bytes())?;
+                    w.write_all(SPLIT)?;
+
+                    serde_json::to_writer(&mut w, &iv)?;
+                    w.write_all(SPLIT)?;
+                }
+            }
+        };
+
+        w.flush().map(|_| w.total)
+    }
+}
+
+impl<'a> From<crate::index::JsonLines<'a>> for CacheWrite<'a> {
+    fn from(value: crate::index::JsonLines<'a>) -> Self {
+        Self::Remote(value)
+    }
+}
+
+impl<'a> From<&'a IndexKrate> for CacheWrite<'a> {
+    fn from(value: &'a IndexKrate) -> Self {
+        Self::Krate(value)
     }
 }

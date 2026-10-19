@@ -1,10 +1,7 @@
-#![allow(missing_docs)]
-
-mod utils;
-
-use http::header;
+use integ::kn;
 use tame_index::{
     IndexLocation, IndexUrl, SparseIndex,
+    external::http::{self, header},
     index::{
         cache::Revision,
         sparse::{HttpRevision, Request},
@@ -49,7 +46,7 @@ fn assert_request_headers(expected: &[(&str, &str)], req: &Request) {
 #[test]
 fn make_request_without_cache() {
     let index = crates_io(env!("CARGO_MANIFEST_DIR"));
-    let lock = &utils::unlocked();
+    let lock = &integ::unlocked();
 
     let req = index
         .make_remote_request("serde".try_into().unwrap(), None, lock)
@@ -71,15 +68,16 @@ const DATE: &str = "Thu, 22 Oct 2023 09:40:03 GMT";
 /// Validates appropriate headers are set when a cache entry does exist
 #[test]
 fn make_request_with_cache() {
-    let td = utils::tempdir();
+    let td = integ::tempdir!();
     let index = crates_io(&td);
-    let lock = &utils::unlocked();
+    let lock = &integ::unlocked();
 
     {
-        let etag_krate = utils::fake_krate("etag-krate", 2);
+        let etag_krate = integ::fake_krate("etag-krate", 2);
         index
             .cache()
             .write_to_cache(
+                etag_krate.name().try_into().unwrap(),
                 &etag_krate,
                 &Revision::Http(HttpRevision::Etag("fake")),
                 lock,
@@ -87,7 +85,7 @@ fn make_request_with_cache() {
             .unwrap();
 
         let req = index
-            .make_remote_request("etag-krate".try_into().unwrap(), None, lock)
+            .make_remote_request(kn!("etag-krate"), None, lock)
             .unwrap();
 
         assert_request_headers(&[(header::IF_NONE_MATCH.as_str(), "fake")], &req);
@@ -96,7 +94,7 @@ fn make_request_with_cache() {
     {
         let req = index
             .make_remote_request(
-                "etag-specified-krate".try_into().unwrap(),
+                kn!("etag-specified-krate"),
                 Some(HttpRevision::Etag(ETAG)),
                 lock,
             )
@@ -106,10 +104,11 @@ fn make_request_with_cache() {
     }
 
     {
-        let modified_krate = utils::fake_krate("modified-krate", 2);
+        let modified_krate = integ::fake_krate("modified-krate", 2);
         index
             .cache()
             .write_to_cache(
+                modified_krate.name().try_into().unwrap(),
                 &modified_krate,
                 &Revision::Http(HttpRevision::LastModified(DATE)),
                 lock,
@@ -117,7 +116,7 @@ fn make_request_with_cache() {
             .unwrap();
 
         let req = index
-            .make_remote_request("modified-krate".try_into().unwrap(), None, lock)
+            .make_remote_request(kn!("modified-krate"), None, lock)
             .unwrap();
 
         assert_request_headers(&[(header::IF_MODIFIED_SINCE.as_str(), DATE)], &req);
@@ -127,14 +126,19 @@ fn make_request_with_cache() {
 /// Validates we can parse a response where the local cache version is up to date
 #[test]
 fn parse_unmodified_response() {
-    let td = utils::tempdir();
+    let td = integ::tempdir!();
     let index = crates_io(&td);
-    let lock = &utils::unlocked();
+    let lock = &integ::unlocked();
 
-    let etag_krate = utils::fake_krate("etag-krate", 2);
+    let etag_krate = integ::fake_krate("etag-krate", 2);
     index
         .cache()
-        .write_to_cache(&etag_krate, &Revision::Http(HttpRevision::Etag(ETAG)), lock)
+        .write_to_cache(
+            kn!("etag-krate"),
+            &etag_krate,
+            &Revision::Http(HttpRevision::Etag(ETAG)),
+            lock,
+        )
         .unwrap();
 
     let response = http::Response::builder()
@@ -144,27 +148,22 @@ fn parse_unmodified_response() {
         .unwrap();
 
     let cached_krate = index
-        .parse_remote_response(
-            "etag-krate".try_into().unwrap(),
-            (&response).into(),
-            true,
-            lock,
-        )
+        .parse_remote_response(kn!("etag-krate"), &response, true, lock)
         .unwrap()
         .expect("cached krate");
 
-    assert_eq!(etag_krate, cached_krate);
+    assert_eq!(etag_krate, cached_krate.deserialize().unwrap());
 }
 
 /// Validates we can parse a modified response
 #[test]
 fn parse_modified_response() {
-    let td = utils::tempdir();
+    let td = integ::tempdir!();
     let index = crates_io(&td);
-    let lock = &utils::unlocked();
+    let lock = &integ::unlocked();
 
     {
-        let etag_krate = utils::fake_krate("etag-krate", 3);
+        let etag_krate = integ::fake_krate("etag-krate", 3);
         let mut serialized = Vec::new();
         etag_krate.write_json_lines(&mut serialized).unwrap();
 
@@ -175,32 +174,23 @@ fn parse_modified_response() {
             .unwrap();
 
         let new_krate = index
-            .parse_remote_response(
-                "etag-krate".try_into().unwrap(),
-                (&response).into(),
-                true,
-                lock,
-            )
+            .parse_remote_response("etag-krate".try_into().unwrap(), &response, true, lock)
             .unwrap()
             .expect("new response");
 
-        assert_eq!(etag_krate, new_krate);
+        assert_eq!(etag_krate, new_krate.deserialize().unwrap());
 
         let cached_krate = index
             .cache()
-            .cached_krate(
-                "etag-krate".try_into().unwrap(),
-                Some(Revision::Http(HttpRevision::Etag(ETAG))),
-                lock,
-            )
+            .cached_krate(kn!("etag-krate"), lock)
             .unwrap()
             .expect("cached krate");
 
-        assert_eq!(etag_krate, cached_krate);
+        assert_eq!(etag_krate, cached_krate.deserialize().unwrap());
     }
 
     {
-        let modified_krate = utils::fake_krate("modified-krate", 3);
+        let modified_krate = integ::fake_krate("modified-krate", 3);
         let mut serialized = Vec::new();
         modified_krate.write_json_lines(&mut serialized).unwrap();
 
@@ -211,27 +201,18 @@ fn parse_modified_response() {
             .unwrap();
 
         let new_krate = index
-            .parse_remote_response(
-                "modified-krate".try_into().unwrap(),
-                (&response).into(),
-                true,
-                lock,
-            )
+            .parse_remote_response("modified-krate".try_into().unwrap(), &response, true, lock)
             .unwrap()
             .expect("new response");
 
-        assert_eq!(modified_krate, new_krate);
+        assert_eq!(modified_krate, new_krate.deserialize().unwrap());
 
         let cached_krate = index
             .cache()
-            .cached_krate(
-                "modified-krate".try_into().unwrap(),
-                Some(Revision::Http(HttpRevision::LastModified(DATE))),
-                lock,
-            )
+            .cached_krate(kn!("modified-krate"), lock)
             .unwrap()
             .expect("cached krate");
 
-        assert_eq!(modified_krate, cached_krate);
+        assert_eq!(modified_krate, cached_krate.deserialize().unwrap());
     }
 }

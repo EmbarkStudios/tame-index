@@ -331,7 +331,8 @@ impl IndexKrate {
         mut bytes: &[u8],
         dedupe: &mut DedupeContext,
     ) -> Result<Self, Error> {
-        use crate::index::cache::split;
+        use crate::utils::split;
+
         // Trim last newline(s) so we don't need to special case the split
         while bytes.last() == Some(&b'\n') {
             bytes = &bytes[..bytes.len() - 1];

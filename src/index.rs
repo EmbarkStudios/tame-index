@@ -4,7 +4,6 @@
 pub mod cache;
 #[allow(missing_docs)]
 pub mod git;
-#[cfg(feature = "local")]
 pub mod local;
 pub mod location;
 #[allow(missing_docs)]
@@ -12,8 +11,7 @@ pub mod sparse;
 
 pub use cache::IndexCache;
 pub use git::GitIndex;
-#[cfg(feature = "local")]
-pub use local::LocalRegistry;
+pub use local::{LocalIndex, LocalRegistry};
 pub use location::{IndexLocation, IndexPath, IndexUrl};
 pub use sparse::SparseIndex;
 
@@ -103,24 +101,25 @@ pub enum ComboIndexCache {
     Git(GitIndex),
     /// A sparse HTTP index
     Sparse(SparseIndex),
-    /// A local registry
-    #[cfg(feature = "local")]
-    Local(LocalRegistry),
+    /// A local index on disk, either a bare index, or the `index` sub-directory of a [`LocalRegistry`]
+    Local(LocalIndex),
+    /// A local registry, which pairs a [`LocalIndex`] with a set of `.crate` tarballs
+    LocalRegistry(LocalRegistry),
 }
 
 impl ComboIndexCache {
     /// Retrieves the index metadata for the specified crate name
     #[inline]
-    pub fn cached_krate(
+    pub fn cached_krate<'l>(
         &self,
         name: crate::KrateName<'_>,
-        lock: &FileLock,
-    ) -> Result<Option<crate::IndexKrate>, Error> {
+        lock: &'l FileLock,
+    ) -> Result<Option<IndexEntry<'_, 'l>>, Error> {
         match self {
             Self::Git(index) => index.cached_krate(name, lock),
             Self::Sparse(index) => index.cached_krate(name, lock),
-            #[cfg(feature = "local")]
-            Self::Local(lr) => lr.cached_krate(name, lock),
+            Self::Local(li) => li.krate(name, lock),
+            Self::LocalRegistry(lr) => lr.index().krate(name, lock),
         }
     }
 
@@ -129,8 +128,8 @@ impl ComboIndexCache {
         match self {
             Self::Git(index) => index.cache.cache_path(name),
             Self::Sparse(index) => index.cache().cache_path(name),
-            #[cfg(feature = "local")]
             Self::Local(lr) => lr.krate_path(name),
+            Self::LocalRegistry(lr) => lr.index().krate_path(name),
         }
     }
 
@@ -138,17 +137,15 @@ impl ComboIndexCache {
     ///
     /// See [`Self::crates_io`] if you want to create a crates.io index based
     /// upon other information in the user's environment
+    ///
+    /// If the [`Indexlocation`] is local, it will only create a [`Self::Local`], a [`Self::LocalRegistry`] must be
+    /// created manually
     pub fn new(il: IndexLocation<'_>) -> Result<Self, Error> {
-        #[cfg(feature = "local")]
-        {
-            if let IndexUrl::Local(path) = il.url {
-                return Ok(Self::Local(LocalRegistry::open(path.into(), true)?));
-            }
-        }
-
         let index = if il.url.is_sparse() {
             let sparse = SparseIndex::new(il)?;
             Self::Sparse(sparse)
+        } else if let IndexUrl::Local(path) = il.url {
+            Self::Local(LocalIndex::open(path.into_owned())?)
         } else {
             let git = GitIndex::new(il)?;
             Self::Git(git)
@@ -172,10 +169,292 @@ impl From<GitIndex> for ComboIndexCache {
     }
 }
 
+/// A `mmap` that is associated with the lifetime of a [`FileLock`]
+pub struct LockedMmap<'l> {
+    #[allow(dead_code)]
+    lock: &'l FileLock,
+    mmap: memmap2::Mmap,
+}
+
+impl<'l> LockedMmap<'l> {
+    /// Mmaps the specified file path, associating it with the provided lock
+    #[inline]
+    #[allow(unsafe_code)]
+    pub fn mmap(path: &crate::Path, lock: &'l FileLock) -> std::io::Result<Self> {
+        let file = std::fs::File::open(path)?;
+        // SAFETY: we pair the lifetime of the lock with mmap, to hopefully prevent faults due to the cache
+        // file changing from underneath us, at least with other actors that respect the file lock
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+
+        Ok(Self { lock, mmap })
+    }
+}
+
+/// An index entry from a remote index
+#[derive(Copy, Clone)]
+pub struct JsonLines<'r>(&'r [u8]);
+
+impl<'r> JsonLines<'r> {
+    /// Performs basic validation that this is a sequence of one or more JSON objects separated by newlines
+    #[inline]
+    pub fn validate(mut re: &'r [u8]) -> Result<Self, crate::error::InvalidRemoteEntry> {
+        let mut line = 0;
+
+        // there should only be one trailing newline from a valid response, remove all of them though so we don't need
+        // to special case the last empty line
+        while re.last() == Some(&b'\n') {
+            re = &re[..re.len() - 1];
+        }
+
+        for item in crate::utils::split(re, b'\n') {
+            if item.len() < 2 || item[0] != b'{' || item[item.len() - 1] != b'}' {
+                return Err(crate::error::InvalidRemoteEntry::NotJson(line));
+            }
+
+            line += 1;
+        }
+
+        if line != 0 {
+            Ok(Self(re))
+        } else {
+            Err(crate::error::InvalidRemoteEntry::Empty)
+        }
+    }
+}
+
+/// An index entry, acquired from either a remote index or a local cache entry
+pub enum IndexEntry<'r, 'l> {
+    /// Data retrieved from a remote source either a sparse index or a git index
+    ///
+    /// This is a series of JSON objects, 1 for each published version, separated by newlines
+    Remote(JsonLines<'r>),
+    /// Data retrieved from a local entry in the registry's `.cache` directory
+    ///
+    /// This is a series of tuples of semver and the same JSON object as found in the remote index, separated by `\0`
+    Cache(LockedMmap<'l>),
+    /// Data retrieved from a local registry
+    ///
+    /// This is the same JSON lines format as a remote registry
+    Local(LockedMmap<'l>),
+}
+
+use crate::{IndexKrate, Revision, utils};
+
+impl IndexEntry<'_, '_> {
+    /// Deserializes all versions in this entry into an [`IndexKrate`]
+    #[inline]
+    pub fn deserialize(&self) -> Result<IndexKrate, Error> {
+        match self {
+            Self::Remote(r) => IndexKrate::from_slice(r.0),
+            Self::Cache(mmap) => {
+                let entry = cache::ValidCacheEntry::read(&mmap.mmap)?;
+                IndexKrate::from_cache(utils::split(entry.version_entries, 0))
+            }
+            Self::Local(mmap) => IndexKrate::from_slice(&mmap.mmap),
+        }
+    }
+
+    /// The same as [`Self::into_krate`] except `Ok(None)` is returned if this is a cache entry and its revision does
+    /// not match the specified revision
+    #[inline]
+    pub fn into_krate_with_revision(
+        self,
+        revision: Revision<'_>,
+    ) -> Result<Option<IndexKrate>, Error> {
+        if let Some(centry) = self.cached()? {
+            if centry.revision != revision {
+                return Ok(None);
+            }
+        }
+
+        self.try_into().map(Some)
+    }
+
+    /// Gets self as a [`cache::ValidCacheEntry`] if it is one
+    #[inline]
+    pub fn cached(&self) -> Result<Option<cache::ValidCacheEntry<'_>>, crate::error::CacheError> {
+        match self {
+            Self::Cache(c) => cache::ValidCacheEntry::read(&c.mmap).map(Some),
+            Self::Remote(_) | Self::Local(_) => Ok(None),
+        }
+    }
+
+    /// Creates an iterator over each version in the index entry
+    #[inline]
+    pub fn iter(&self) -> Result<impl Iterator<Item = IndexEntryVersion<'_>>, Error> {
+        match self {
+            Self::Remote(r) => Ok(IndexEntryIter::Remote(utils::split(r.0, b'\n'))),
+            Self::Cache(c) => {
+                let entry = cache::ValidCacheEntry::read(&c.mmap)?;
+                Ok(IndexEntryIter::Cache(utils::split(
+                    entry.version_entries,
+                    0,
+                )))
+            }
+            Self::Local(l) => Ok(IndexEntryIter::Remote(utils::split(&l.mmap, b'\n'))),
+        }
+    }
+}
+
+impl TryFrom<IndexEntry<'_, '_>> for IndexKrate {
+    type Error = Error;
+
+    /// Deserializes the entry into an [`IndexKrate`]
+    fn try_from(value: IndexEntry<'_, '_>) -> Result<Self, Self::Error> {
+        value.deserialize()
+    }
+}
+
+enum IndexEntryIter<'r> {
+    Remote(utils::Split<'r>),
+    Cache(utils::Split<'r>),
+}
+
+impl<'r> Iterator for IndexEntryIter<'r> {
+    type Item = IndexEntryVersion<'r>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Remote(r) => r.next().map(|json| IndexEntryVersion {
+                version: None,
+                json,
+            }),
+            Self::Cache(c) => {
+                let version = c.next()?;
+                let json = c.next()?;
+
+                Some(IndexEntryVersion {
+                    version: Some(version),
+                    json,
+                })
+            }
+        }
+    }
+}
+
+/// A single version in the [`IndexEntry`]
+pub struct IndexEntryVersion<'r> {
+    version: Option<&'r [u8]>,
+    json: &'r [u8],
+}
+
+impl IndexEntryVersion<'_> {
+    /// Deserializes the entire [`crate::krate::IndexVersion`]
+    #[inline]
+    pub fn deserialize(&self) -> Result<crate::krate::IndexVersion, Error> {
+        serde_json::from_slice(self.json).map_err(Error::from)
+    }
+
+    #[inline]
+    fn find_version(&self, split: &memchr::memmem::Finder<'_>) -> Option<&[u8]> {
+        // the JSON in the index is (currently) {name:,vers:,deps:[..],..}, so we just assume it is always the second field
+        let mut start = 0;
+
+        for end in memchr::memchr_iter(b',', self.json) {
+            let split = split.find(&self.json[start..end])?;
+
+            let key = &self.json[start..start + split];
+
+            if key.ends_with(b"\"vers\"") {
+                let value = &self.json[start + split + 1..end];
+                return value
+                    .strip_prefix(b" ")
+                    .unwrap_or(value)
+                    .strip_prefix(b"\"")?
+                    .strip_suffix(b"\"");
+            }
+
+            start = end + 1;
+        }
+
+        None
+    }
+
+    /// Retrieves the version and json raw bytes
+    #[inline]
+    pub fn raw(&self) -> (&str, &[u8]) {
+        let version = if let Some(v) = self.version {
+            v
+        } else {
+            let finder = memchr::memmem::Finder::new(&b":");
+            self.find_version(&finder).unwrap_or(b"")
+        };
+
+        (std::str::from_utf8(version).unwrap_or(""), self.json)
+    }
+
+    /// Retrieves only the version and the yanked status of this entry
+    pub fn yanked(self) -> Result<(semver::Version, bool), Error> {
+        let mut iter = memchr::memchr2_iter(b',', b'}', self.json);
+        let finder = memchr::memmem::Finder::new(&b":");
+
+        let version = if let Some(v) = self.version {
+            v
+        } else {
+            self.find_version(&finder).unwrap_or(b"")
+        };
+
+        let version = std::str::from_utf8(version).unwrap_or("").parse()?;
+
+        // Conversely `yanked` is one of the last fields, so we search from the end, currently this field is always
+        // present though there could be a future where it is only present when the version has been yanked, thus we stop
+        // searching and assume false once we hit a '}' with the assumption that the overall structure will stay the same
+        // and this indicates the end of the `deps` object. If that isn't the case and yanked moves to before the `deps`
+        // section then we could add advancement of the iterator from where it left off if we already parsed the version
+        if iter.next_back().map_or(b'%', |i| self.json[i]) != b'}' {
+            return Err(Error::Io(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "expected version to end with '}' but it did not",
+            )));
+        }
+
+        let mut end = self.json.len() - 1;
+        let yanked = loop {
+            let Some(next) = iter.next_back() else {
+                break false;
+            };
+
+            if self.json[next] == b'}' {
+                break false;
+            }
+
+            let item = &self.json[next + 1..end];
+            end = next;
+
+            let Some(split) = finder.find(item) else {
+                continue;
+            };
+            let (key, value) = item.split_at(split);
+            if !key.ends_with(b"\"yanked\"") {
+                continue;
+            }
+
+            match value[1..].strip_prefix(b" ").unwrap_or(&value[1..]) {
+                b"false" => break false,
+                b"true" => break true,
+                _ => {
+                    return Err(Error::Io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "yanked field did not contain a valid boolean value",
+                    )));
+                }
+            }
+        };
+
+        Ok((version, yanked))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::IndexConfig;
-    use crate::kn;
+
+    macro_rules! kn {
+        ($n:literal) => {
+            crate::KrateName::from_static($n)
+        };
+    }
 
     /// Validates we get the non-redirect url for crates.io downloads
     #[test]

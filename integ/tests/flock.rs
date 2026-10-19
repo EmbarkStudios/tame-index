@@ -3,8 +3,6 @@
 use std::time::Duration;
 use tame_index::utils::flock::LockOptions;
 
-mod utils;
-
 enum LockKind {
     Exclusive,
     Shared,
@@ -60,7 +58,7 @@ fn kill(mut child: std::process::Child) {
 /// Validates we can take a lock we know is uncontended
 #[test]
 fn can_take_lock() {
-    let td = utils::tempdir();
+    let td = integ::tempdir!();
     let ctl = td.path().join("can-take-lock");
 
     let lo = LockOptions::new(&ctl).exclusive(false);
@@ -73,7 +71,7 @@ fn can_take_lock() {
 /// Validates we can create parent directories for a lock file if they don't exist
 #[test]
 fn can_take_lock_in_non_existant_directory() {
-    let td = utils::tempdir();
+    let td = integ::tempdir!();
     let ctl = td.path().join("sub/dir/can-take-lock");
 
     let lo = LockOptions::new(&ctl).exclusive(false);
@@ -84,7 +82,7 @@ fn can_take_lock_in_non_existant_directory() {
 /// Validates we can take multiple shared locks of the same file
 #[test]
 fn can_take_shared_lock() {
-    let td = utils::tempdir();
+    let td = integ::tempdir!();
     let ctl = td.path().join("can-take-shared-lock");
 
     let _ = std::fs::OpenOptions::new()
@@ -114,7 +112,7 @@ fn can_take_shared_lock() {
 /// Validates we can wait for a lock to be released
 #[test]
 fn waits_lock() {
-    let td = utils::tempdir();
+    let td = integ::tempdir!();
     let ctl = td.path().join("waits-lock");
 
     let _ = std::fs::OpenOptions::new()
@@ -145,7 +143,7 @@ fn waits_lock() {
 /// Ensures we can timeout if it takes too long to acquire the lock
 #[test]
 fn wait_lock_times_out() {
-    let td = utils::tempdir();
+    let td = integ::tempdir!();
     let ctl = td.path().join("wait-lock-times-out");
 
     let _ = std::fs::OpenOptions::new()

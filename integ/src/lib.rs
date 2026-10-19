@@ -14,13 +14,13 @@ impl TempDir {
     }
 }
 
-impl Default for TempDir {
-    #[inline]
-    fn default() -> Self {
-        Self {
+#[macro_export]
+macro_rules! tempdir {
+    () => {
+        $crate::TempDir {
             td: tempfile::TempDir::new_in(env!("CARGO_TARGET_TMPDIR")).unwrap(),
         }
-    }
+    };
 }
 
 impl AsRef<Path> for TempDir {
@@ -41,11 +41,6 @@ impl<'td> From<&'td TempDir> for PathBuf {
     fn from(td: &'td TempDir) -> Self {
         td.path().to_owned()
     }
-}
-
-#[inline]
-pub fn tempdir() -> TempDir {
-    TempDir::default()
 }
 
 #[inline]
@@ -78,4 +73,11 @@ pub fn fake_krate(name: &str, num_versions: u8) -> IndexKrate {
     }
 
     IndexKrate { versions }
+}
+
+#[macro_export]
+macro_rules! kn {
+    ($n:literal) => {
+        tame_index::KrateName::from_static($n)
+    };
 }

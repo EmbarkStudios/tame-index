@@ -109,17 +109,12 @@ impl GitIndex {
     /// There are no guarantees around freshness, and no network I/O will be
     /// performed.
     #[inline]
-    pub fn cached_krate(
+    pub fn cached_krate<'l>(
         &self,
         name: KrateName<'_>,
-        lock: &FileLock,
-    ) -> Result<Option<IndexKrate>, Error> {
-        self.cache.cached_krate(
-            name,
-            self.head_commit()
-                .map(|sha1| crate::index::cache::Revision::Git(GitRevision::Hex(*sha1))),
-            lock,
-        )
+        lock: &'l FileLock,
+    ) -> Result<Option<crate::index::IndexEntry<'_, 'l>>, Error> {
+        self.cache.cached_krate(name, lock)
     }
 
     /// Writes the specified crate to the cache.
@@ -136,9 +131,11 @@ impl GitIndex {
         let Some(id) = blob_id.or_else(|| self.head_commit().copied()) else {
             return Ok(None);
         };
+
         self.cache
             .write_to_cache(
-                krate,
+                krate.name().try_into()?,
+                super::cache::CacheWrite::Krate(krate),
                 &crate::index::cache::Revision::Git(GitRevision::Hex(id)),
                 lock,
             )

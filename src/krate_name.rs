@@ -1,13 +1,13 @@
 use crate::error::{Error, InvalidKrateName};
 
-#[cfg(test)]
-/// Create a `KrateName` from a string literal.
-#[macro_export]
-macro_rules! kn {
-    ($kn:literal) => {
-        $crate::KrateName($kn)
-    };
-}
+// #[cfg(test)]
+// /// Create a `KrateName` from a string literal.
+// #[macro_export]
+// macro_rules! kn {
+//     ($kn:literal) => {
+//         $crate::KrateName($kn)
+//     };
+// }
 
 /// Used to wrap user-provided strings so that bad crate names are required to
 /// be handled separately from things more outside the user control such as I/O
@@ -31,6 +31,30 @@ impl<'name> KrateName<'name> {
     #[inline]
     pub fn crates_io(name: &'name str) -> Result<Self, Error> {
         Self::validated(name, Some(64))
+    }
+
+    /// Creates a crate name from a static string, failing to compile if the name is invalid.
+    ///
+    /// Follows the same rules as [`Self::crates_io`]
+    #[inline]
+    pub const fn from_static(name: &'static str) -> Self {
+        let b = name.as_bytes();
+
+        assert!(!name.is_empty());
+        assert!(b[0].is_ascii_alphabetic());
+
+        let mut i = 1;
+        loop {
+            if i >= name.len() {
+                break;
+            } else {
+                let c = b[i];
+                assert!(c.is_ascii_alphanumeric() || c == b'-' || c == b'_');
+            }
+            i += 1;
+        }
+
+        Self(name)
     }
 
     /// Ensures the specified string is a valid crate name according to [cargo](https://github.com/rust-lang/cargo/blob/00b8da63269420610758464c02fc46584e373dd3/src/cargo/ops/cargo_new.rs#L167-L264)

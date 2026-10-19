@@ -1,6 +1,8 @@
 //! Provides several useful functions for determining the disk location of a
 //! remote registry index
 
+#![allow(missing_docs)]
+
 use crate::{Error, InvalidUrl, InvalidUrlError, PathBuf};
 
 pub mod flock;
@@ -24,6 +26,35 @@ pub fn cargo_home() -> Result<crate::PathBuf, crate::Error> {
             .join(".cargo")
     };
     Ok(crate::PathBuf::from_path_buf(chome)?)
+}
+
+/// A helper for memchr
+pub struct Split<'a> {
+    haystack: &'a [u8],
+    needle: u8,
+}
+
+impl<'a> Iterator for Split<'a> {
+    type Item = &'a [u8];
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a [u8]> {
+        if self.haystack.is_empty() {
+            return None;
+        }
+        let (ret, remaining) = match memchr::memchr(self.needle, self.haystack) {
+            Some(pos) => (&self.haystack[..pos], &self.haystack[pos + 1..]),
+            None => (self.haystack, &[][..]),
+        };
+        self.haystack = remaining;
+        Some(ret)
+    }
+}
+
+/// Gives an iterator over the specified buffer, where each item is split by the specified
+/// needle value
+pub fn split(haystack: &[u8], needle: u8) -> Split<'_> {
+    Split { haystack, needle }
 }
 
 /// Encodes a slice of bytes into a hexadecimal string to the specified buffer

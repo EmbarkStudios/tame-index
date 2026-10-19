@@ -1,7 +1,7 @@
 //! Provides the various error types for this crate
 
-#[cfg(feature = "local")]
-pub use crate::index::local::LocalRegistryError;
+#[cfg(feature = "local-builder")]
+pub use crate::index::local::builder::LocalRegistryError;
 
 /// The core error type for this library
 #[derive(Debug, thiserror::Error)]
@@ -48,12 +48,15 @@ pub enum Error {
     #[error(transparent)]
     Semver(#[from] semver::Error),
     /// A local registry is invalid
-    #[cfg(feature = "local")]
+    #[cfg(feature = "local-builder")]
     #[error(transparent)]
     Local(#[from] LocalRegistryError),
     /// Failed to lock a file
     #[error(transparent)]
     Lock(#[from] crate::utils::flock::FileLockError),
+    /// The entry from a remote index was invalid
+    #[error(transparent)]
+    InvalidRemoteEntry(#[from] InvalidRemoteEntry),
 }
 
 impl From<std::path::PathBuf> for Error {
@@ -187,4 +190,15 @@ pub enum HttpError {
     /// the user allotted time
     #[error("request could not be completed in the allotted timeframe")]
     Timeout,
+}
+
+/// Errors when validating a remote index entry
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidRemoteEntry {
+    /// The entry for a crate was empty, every entry must have at least one published version to be valid
+    #[error("the remote entry was empty")]
+    Empty,
+    /// A specific line did not contain a JSON object
+    #[error("the remote entry had invalid JSON on line {0}")]
+    NotJson(u32),
 }
