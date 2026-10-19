@@ -297,10 +297,10 @@ impl IndexEntry<'_, '_> {
         }
     }
 
-    /// The same as [`Self::into_krate`] except `Ok(None)` is returned if this is a cache entry and its revision does
+    /// The same as [`Self::deserialize`] except `Ok(None)` is returned if this is a cache entry and its revision does
     /// not match the specified revision
     #[inline]
-    pub fn into_krate_with_revision(
+    pub fn deserialize_with_revision(
         self,
         revision: Revision<'_>,
     ) -> Result<Option<IndexKrate>, Error> {
