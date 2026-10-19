@@ -1,13 +1,98 @@
 use crate::error::{Error, InvalidKrateName};
 
-// #[cfg(test)]
-// /// Create a `KrateName` from a string literal.
-// #[macro_export]
-// macro_rules! kn {
-//     ($kn:literal) => {
-//         $crate::KrateName($kn)
-//     };
-// }
+// This is a single table, binary sorted so that we can more easily just
+// check matches and move on
+//
+// 1. Rustlang keywords, see https://doc.rust-lang.org/reference/keywords.html
+// 2. Windows reserved, see https://github.com/rust-lang/cargo/blob/b40be8bdcf2eff9ed81702594d44bf96c27973a6/src/cargo/util/restricted_names.rs#L26-L32
+// 3. Cargo artifacts, see https://github.com/rust-lang/cargo/blob/b40be8bdcf2eff9ed81702594d44bf96c27973a6/src/cargo/util/restricted_names.rs#L35-L37
+// 4. Rustlang std, see https://github.com/rust-lang/cargo/blob/b40be8bdcf2eff9ed81702594d44bf96c27973a6/src/cargo/ops/cargo_new.rs#L225-L239
+use crate::error::ReservedNameKind::{Artifact, Keyword, Standard, Windows};
+const DISALLOWED: &[(&str, crate::error::ReservedNameKind)] = &[
+    ("Self", Keyword),
+    ("abstract", Keyword),
+    ("alloc", Standard),
+    ("as", Keyword),
+    ("async", Keyword),
+    ("aux", Windows),
+    ("await", Keyword),
+    ("become", Keyword),
+    ("box", Keyword),
+    ("break", Keyword),
+    ("build", Artifact),
+    ("com1", Windows),
+    ("com2", Windows),
+    ("com3", Windows),
+    ("com4", Windows),
+    ("com5", Windows),
+    ("com6", Windows),
+    ("com7", Windows),
+    ("com8", Windows),
+    ("com9", Windows),
+    ("con", Windows),
+    ("const", Keyword),
+    ("continue", Keyword),
+    ("core", Standard),
+    ("crate", Keyword),
+    ("deps", Artifact),
+    ("do", Keyword),
+    ("dyn", Keyword),
+    ("else", Keyword),
+    ("enum", Keyword),
+    ("examples", Artifact),
+    ("extern", Keyword),
+    ("false", Keyword),
+    ("final", Keyword),
+    ("fn", Keyword),
+    ("for", Keyword),
+    ("if", Keyword),
+    ("impl", Keyword),
+    ("in", Keyword),
+    ("incremental", Artifact),
+    ("let", Keyword),
+    ("loop", Keyword),
+    ("lpt1", Windows),
+    ("lpt2", Windows),
+    ("lpt3", Windows),
+    ("lpt4", Windows),
+    ("lpt5", Windows),
+    ("lpt6", Windows),
+    ("lpt7", Windows),
+    ("lpt8", Windows),
+    ("lpt9", Windows),
+    ("macro", Keyword),
+    ("match", Keyword),
+    ("mod", Keyword),
+    ("move", Keyword),
+    ("mut", Keyword),
+    ("nul", Windows),
+    ("override", Keyword),
+    ("priv", Keyword),
+    ("prn", Windows),
+    ("proc-macro", Standard),
+    ("proc_macro", Standard),
+    ("pub", Keyword),
+    ("ref", Keyword),
+    ("return", Keyword),
+    ("self", Keyword),
+    ("static", Keyword),
+    ("std", Standard),
+    ("struct", Keyword),
+    ("super", Keyword),
+    ("test", Standard),
+    ("trait", Keyword),
+    ("true", Keyword),
+    ("try", Keyword),
+    ("type", Keyword),
+    ("typeof", Keyword),
+    ("unsafe", Keyword),
+    ("unsized", Keyword),
+    ("use", Keyword),
+    ("virtual", Keyword),
+    ("where", Keyword),
+    ("while", Keyword),
+    ("yield", Keyword),
+];
 
 /// Used to wrap user-provided strings so that bad crate names are required to
 /// be handled separately from things more outside the user control such as I/O
@@ -42,6 +127,7 @@ impl<'name> KrateName<'name> {
 
         assert!(!name.is_empty());
         assert!(b[0].is_ascii_alphabetic());
+        assert!(name.len() <= 64);
 
         let mut i = 1;
         loop {
@@ -50,6 +136,29 @@ impl<'name> KrateName<'name> {
             } else {
                 let c = b[i];
                 assert!(c.is_ascii_alphanumeric() || c == b'-' || c == b'_');
+            }
+            i += 1;
+        }
+
+        i = 0;
+        while i < DISALLOWED.len() {
+            let dis = DISALLOWED[i].0.as_bytes();
+            if dis.len() == b.len() {
+                let mut j = 0;
+
+                let same = loop {
+                    if j == b.len() {
+                        break true;
+                    }
+
+                    if dis[j] != b[j] {
+                        break false;
+                    }
+
+                    j += 1;
+                };
+
+                assert!(!same, "name is reserved");
             }
             i += 1;
         }
@@ -100,100 +209,6 @@ impl<'name> KrateName<'name> {
                 .into());
             }
         }
-
-        // This is a single table, binary sorted so that we can more easily just
-        // check matches and move on
-        //
-        // 1. Rustlang keywords, see https://doc.rust-lang.org/reference/keywords.html
-        // 2. Windows reserved, see https://github.com/rust-lang/cargo/blob/b40be8bdcf2eff9ed81702594d44bf96c27973a6/src/cargo/util/restricted_names.rs#L26-L32
-        // 3. Cargo artifacts, see https://github.com/rust-lang/cargo/blob/b40be8bdcf2eff9ed81702594d44bf96c27973a6/src/cargo/util/restricted_names.rs#L35-L37
-        // 4. Rustlang std, see https://github.com/rust-lang/cargo/blob/b40be8bdcf2eff9ed81702594d44bf96c27973a6/src/cargo/ops/cargo_new.rs#L225-L239
-        use crate::error::ReservedNameKind::{Artifact, Keyword, Standard, Windows};
-        const DISALLOWED: &[(&str, crate::error::ReservedNameKind)] = &[
-            ("Self", Keyword),
-            ("abstract", Keyword),
-            ("alloc", Standard),
-            ("as", Keyword),
-            ("async", Keyword),
-            ("aux", Windows),
-            ("await", Keyword),
-            ("become", Keyword),
-            ("box", Keyword),
-            ("break", Keyword),
-            ("build", Artifact),
-            ("com1", Windows),
-            ("com2", Windows),
-            ("com3", Windows),
-            ("com4", Windows),
-            ("com5", Windows),
-            ("com6", Windows),
-            ("com7", Windows),
-            ("com8", Windows),
-            ("com9", Windows),
-            ("con", Windows),
-            ("const", Keyword),
-            ("continue", Keyword),
-            ("core", Standard),
-            ("crate", Keyword),
-            ("deps", Artifact),
-            ("do", Keyword),
-            ("dyn", Keyword),
-            ("else", Keyword),
-            ("enum", Keyword),
-            ("examples", Artifact),
-            ("extern", Keyword),
-            ("false", Keyword),
-            ("final", Keyword),
-            ("fn", Keyword),
-            ("for", Keyword),
-            ("if", Keyword),
-            ("impl", Keyword),
-            ("in", Keyword),
-            ("incremental", Artifact),
-            ("let", Keyword),
-            ("loop", Keyword),
-            ("lpt1", Windows),
-            ("lpt2", Windows),
-            ("lpt3", Windows),
-            ("lpt4", Windows),
-            ("lpt5", Windows),
-            ("lpt6", Windows),
-            ("lpt7", Windows),
-            ("lpt8", Windows),
-            ("lpt9", Windows),
-            ("macro", Keyword),
-            ("match", Keyword),
-            ("mod", Keyword),
-            ("move", Keyword),
-            ("mut", Keyword),
-            ("nul", Windows),
-            ("override", Keyword),
-            ("priv", Keyword),
-            ("prn", Windows),
-            ("proc-macro", Standard),
-            ("proc_macro", Standard),
-            ("pub", Keyword),
-            ("ref", Keyword),
-            ("return", Keyword),
-            ("self", Keyword),
-            ("static", Keyword),
-            ("std", Standard),
-            ("struct", Keyword),
-            ("super", Keyword),
-            ("test", Standard),
-            ("trait", Keyword),
-            ("true", Keyword),
-            ("try", Keyword),
-            ("type", Keyword),
-            ("typeof", Keyword),
-            ("unsafe", Keyword),
-            ("unsized", Keyword),
-            ("use", Keyword),
-            ("virtual", Keyword),
-            ("where", Keyword),
-            ("while", Keyword),
-            ("yield", Keyword),
-        ];
 
         if let Ok(i) = DISALLOWED.binary_search_by_key(&name, |(k, _v)| k) {
             let (reserved, kind) = DISALLOWED[i];
