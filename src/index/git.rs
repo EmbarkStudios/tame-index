@@ -1,9 +1,12 @@
+//! Types and utilities for interacting with [git registry indices](https://doc.rust-lang.org/cargo/reference/registry-index.html#git-protocol)
+
 use super::{FileLock, IndexCache};
 use crate::{Error, IndexKrate, KrateName, PathBuf, utils};
 
 /// The URL of the crates.io index for use with git
 pub const CRATES_IO_INDEX: &str = "https://github.com/rust-lang/crates.io-index";
 
+/// A 40-byte hex string
 pub type HexBytes = [u8; 40];
 
 /// Hex encoded sha1
@@ -43,8 +46,11 @@ impl From<[u8; 20]> for Sha1Hex {
     }
 }
 
+/// Revision that can come from a git registry index
 pub enum GitRevision {
+    /// The raw 20-byte SHA1 of a git revision
     Raw([u8; 20]),
+    /// The 40-byte hex string representation of a 20-byte SHA1 of a git revision
     Hex(Sha1Hex),
 }
 

@@ -43,7 +43,7 @@ jobs:
       - name: cargo test
         run: |
           cargo test --all-features
-          cargo build --manifest-path integ/Cargo.toml
+          cargo test --manifest-path integ/Cargo.toml
 
   deny-check:
     name: cargo-deny

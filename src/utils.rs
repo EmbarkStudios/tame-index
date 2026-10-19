@@ -1,8 +1,6 @@
 //! Provides several useful functions for determining the disk location of a
 //! remote registry index
 
-#![allow(missing_docs)]
-
 use crate::{Error, InvalidUrl, InvalidUrlError, PathBuf};
 
 pub mod flock;

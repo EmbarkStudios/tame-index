@@ -2,11 +2,9 @@
 //! indices
 
 pub mod cache;
-#[allow(missing_docs)]
 pub mod git;
 pub mod local;
 pub mod location;
-#[allow(missing_docs)]
 pub mod sparse;
 
 pub use cache::IndexCache;

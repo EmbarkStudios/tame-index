@@ -1,3 +1,5 @@
+//! Types and utilities for interacting with an [HTTP sparse indices](https://doc.rust-lang.org/cargo/reference/registry-index.html#sparse-protocol)
+
 use super::{FileLock, IndexCache, IndexEntry};
 use crate::{Error, HttpError, KrateName};
 use http::header::{self, HeaderName as Name, HeaderValue as Value};
@@ -5,6 +7,7 @@ use http::header::{self, HeaderName as Name, HeaderValue as Value};
 /// The default URL of the crates.io HTTP index
 pub const CRATES_IO_HTTP_INDEX: &str = "sparse+https://index.crates.io/";
 
+/// Revisions of index entries that can come from a sparse index
 pub enum HttpRevision<'stack> {
     /// The contents of the [`etag`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag) header
     Etag(&'stack str),
@@ -12,10 +15,13 @@ pub enum HttpRevision<'stack> {
     LastModified(&'stack str),
 }
 
-/// A request to a remote index for the metadata entry for a specific crate
+/// An HTTP request to a remote index for the metadata entry for a specific crate
 pub struct Request {
+    /// The url to send the request to
     pub uri: String,
+    /// As of now this will always be `GET`
     pub method: http::Method,
+    /// The headers to send when making the request
     pub headers: [(Name, Value); 3],
 }
 
@@ -34,9 +40,13 @@ impl From<Request> for http::Request<()> {
     }
 }
 
+/// A bare response
 pub struct Response<'r> {
+    /// The [status code](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status)
     pub status_code: http::StatusCode,
+    /// The revision to use for the response, currently either the `etag` or `last-modified` header values
     pub revision: Option<HttpRevision<'r>>,
+    /// The full body, which should be in the JSON lines format
     pub body: &'r [u8],
 }
 
@@ -299,6 +309,8 @@ impl Default for EtagCache {
 }
 
 impl EtagCache {
+    /// The same as [`SparseIndex::parse_remote_response`] except a cached `etag` is used if one has been cached for this
+    /// crate previously
     #[inline]
     pub fn make_remote_request(
         &self,
@@ -315,6 +327,7 @@ impl EtagCache {
         index.make_remote_request(name, etag.map(HttpRevision::Etag), lock)
     }
 
+    /// The same as [`SparseIndex::parse_remote_response`], except the `etag` is cached for any subsequent responses
     #[inline]
     pub fn parse_remote_response<'r, 'l>(
         &mut self,
