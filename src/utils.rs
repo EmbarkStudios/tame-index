@@ -3,8 +3,6 @@
 
 use crate::{Error, InvalidUrl, InvalidUrlError, PathBuf};
 
-pub mod flock;
-
 /// Returns the storage directory (in utf-8) used by Cargo, often known as
 /// `.cargo` or `CARGO_HOME`
 #[inline]

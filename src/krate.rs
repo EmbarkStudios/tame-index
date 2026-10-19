@@ -5,49 +5,181 @@ mod dedupe;
 use crate::Error;
 use dedupe::DedupeContext;
 use semver::Version;
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, de::Visitor};
 use smol_str::SmolStr;
 use std::{collections::BTreeMap, sync::Arc};
+
+type Key<'l> = std::borrow::Cow<'l, str>;
 
 /// A mapping of feature name to the features it enables
 pub type FeatureMap = BTreeMap<String, Vec<String>>;
 
 /// A single version of a crate (package) published to the index
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexVersion {
     /// [Name](https://doc.rust-lang.org/cargo/reference/manifest.html#the-name-field)
     pub name: SmolStr,
     /// [Version](https://doc.rust-lang.org/cargo/reference/manifest.html#the-version-field)
-    #[serde(rename = "vers")]
     pub version: SmolStr,
     /// [Dependencies](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html)
     pub deps: Arc<[IndexDependency]>,
     /// The SHA-256 for this crate version's tarball
-    #[serde(rename = "cksum")]
     pub checksum: Chksum,
     /// [Features](https://doc.rust-lang.org/cargo/reference/features.html)
     features: Arc<FeatureMap>,
     /// Version 2 of the index includes this field
     /// <https://rust-lang.github.io/rfcs/3143-cargo-weak-namespaced-features.html#index-changes>
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     features2: Option<Arc<FeatureMap>>,
     /// Whether the crate is yanked from the remote index or not
-    #[serde(default)]
     pub yanked: bool,
     /// [Links](https://doc.rust-lang.org/cargo/reference/manifest.html#the-links-field)
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub links: Option<Box<SmolStr>>,
     /// [Rust Version](https://doc.rust-lang.org/cargo/reference/manifest.html#the-rust-version-field)
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub rust_version: Option<SmolStr>,
     /// Publication time of the crate
     ///
     /// As of now this is a RFC 3339 UTC timestamp
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub pubtime: Option<SmolStr>,
-    /// The index version, 1 if not set, v2 indicates presence of feature2 field
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The index version, 1 if not set, v2 indicates presence of features2 field
     v: Option<u32>,
+}
+
+macro_rules! required {
+    ($field:ident) => {
+        $field.ok_or_else(|| serde::de::Error::missing_field(stringify!($field)))?
+    };
+}
+
+macro_rules! default {
+    ($field:ident) => {
+        $field.unwrap_or_default()
+    };
+}
+
+impl<'de> Deserialize<'de> for IndexVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visit;
+
+        impl<'de> Visitor<'de> for Visit {
+            type Value = IndexVersion;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("published version metadata")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut name = None;
+                let mut vers = None;
+                let mut deps = None;
+                let mut cksum = None;
+                let mut features = None;
+                let mut features2 = None;
+                let mut yanked = None;
+                let mut links = None;
+                let mut rust_version = None;
+                let mut pubtime = None;
+                let mut v = None;
+
+                while let Some(k) = map.next_key::<Key<'de>>()? {
+                    match k.as_ref() {
+                        "name" => {
+                            name = Some(map.next_value()?);
+                        }
+                        "vers" => {
+                            vers = Some(map.next_value()?);
+                        }
+                        "cksum" => {
+                            cksum = Some(map.next_value()?);
+                        }
+                        "deps" => {
+                            let v: Vec<IndexDependency> = map.next_value()?;
+                            deps = Some(v.into());
+                        }
+                        "features" => {
+                            features = Some(Arc::new(map.next_value()?));
+                        }
+                        "features2" => {
+                            features2 = Some(Arc::new(map.next_value()?));
+                        }
+                        "yanked" => {
+                            yanked = Some(map.next_value()?);
+                        }
+                        "links" => {
+                            links = map.next_value::<Option<SmolStr>>()?.map(Box::new);
+                        }
+                        "rust_version" => {
+                            rust_version = Some(map.next_value()?);
+                        }
+                        "pubtime" => {
+                            pubtime = Some(map.next_value()?);
+                        }
+                        "v" => {
+                            v = Some(map.next_value()?);
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(IndexVersion {
+                    name: required!(name),
+                    version: required!(vers),
+                    deps: required!(deps),
+                    checksum: required!(cksum),
+                    features: required!(features),
+                    features2,
+                    yanked: default!(yanked),
+                    links,
+                    rust_version,
+                    pubtime,
+                    v,
+                })
+            }
+        }
+
+        deserializer.deserialize_any(Visit)
+    }
+}
+
+impl Serialize for IndexVersion {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut m = serializer.serialize_map(Some(11))?;
+
+        m.serialize_entry("name", &self.name)?;
+        m.serialize_entry("vers", &self.version)?;
+        m.serialize_entry("deps", &*self.deps)?;
+        m.serialize_entry("cksum", &self.checksum)?;
+        m.serialize_entry("features", &*self.features)?;
+        if let Some(f2) = &self.features2 {
+            m.serialize_entry("features2", &**f2)?;
+        }
+        m.serialize_entry("yanked", &self.yanked)?;
+        if let Some(l) = &self.links {
+            m.serialize_entry("links", l)?;
+        }
+        if let Some(rv) = &self.rust_version {
+            m.serialize_entry("rust_version", rv)?;
+        }
+        if let Some(pt) = &self.pubtime {
+            m.serialize_entry("pubtime", pt)?;
+        }
+        if let Some(v) = &self.v {
+            m.serialize_entry("v", v)?;
+        }
+
+        m.end()
+    }
 }
 
 impl IndexVersion {
@@ -135,7 +267,7 @@ impl IndexVersion {
 }
 
 /// A single dependency of a specific crate version
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct IndexDependency {
     /// Dependency's arbitrary nickname (it may be an alias). Use [`Self::crate_name`] for actual crate name.
     pub name: SmolStr,
@@ -150,11 +282,109 @@ pub struct IndexDependency {
     /// Cfg expression applied to the dependency
     pub target: Option<Box<SmolStr>>,
     /// The kind of the dependency
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub kind: Option<DependencyKind>,
     /// The name of the actual crate, if it was renamed in the crate's manifest
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub package: Option<Box<SmolStr>>,
+}
+
+impl<'de> Deserialize<'de> for IndexDependency {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visit;
+
+        impl<'de> Visitor<'de> for Visit {
+            type Value = IndexDependency;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a dependency")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut name = None;
+                let mut req = None;
+                let mut features = None;
+                let mut optional = None;
+                let mut default_features = None;
+                let mut target = None;
+                let mut kind = None;
+                let mut package = None;
+
+                while let Some(k) = map.next_key::<Key<'de>>()? {
+                    match k.as_ref() {
+                        "name" => {
+                            name = Some(map.next_value()?);
+                        }
+                        "req" => {
+                            req = Some(map.next_value()?);
+                        }
+                        "features" => {
+                            features = Some(map.next_value()?);
+                        }
+                        "optional" => {
+                            optional = Some(map.next_value()?);
+                        }
+                        "default_features" => {
+                            default_features = Some(map.next_value()?);
+                        }
+                        "target" => {
+                            target = map.next_value()?;
+                        }
+                        "kind" => {
+                            kind = Some(map.next_value()?);
+                        }
+                        "package" => {
+                            package = Some(map.next_value()?);
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(IndexDependency {
+                    name: required!(name),
+                    req: required!(req),
+                    features: required!(features),
+                    optional: required!(optional),
+                    default_features: required!(default_features),
+                    target,
+                    kind: required!(kind),
+                    package,
+                })
+            }
+        }
+
+        deserializer.deserialize_any(Visit)
+    }
+}
+
+impl Serialize for IndexDependency {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut m = serializer.serialize_map(Some(11))?;
+
+        m.serialize_entry("name", &self.name)?;
+        m.serialize_entry("req", &self.req)?;
+        m.serialize_entry("features", &self.features)?;
+        m.serialize_entry("optional", &self.optional)?;
+        m.serialize_entry("default_features", &self.default_features)?;
+        m.serialize_entry("target", &self.target)?;
+        if let Some(k) = &self.kind {
+            m.serialize_entry("kind", k)?;
+        }
+        if let Some(p) = &self.package {
+            m.serialize_entry("package", p)?;
+        }
+
+        m.end()
+    }
 }
 
 impl IndexDependency {
@@ -226,8 +456,7 @@ impl IndexDependency {
 }
 
 /// Section in which this dependency was defined
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, Default)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default)]
 pub enum DependencyKind {
     /// Used at run time
     #[default]
@@ -238,8 +467,44 @@ pub enum DependencyKind {
     Build,
 }
 
+impl<'de> Deserialize<'de> for DependencyKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let v = Key::deserialize(deserializer)?;
+
+        Ok(match v.as_ref() {
+            "normal" => Self::Normal,
+            "dev" => Self::Dev,
+            "build" => Self::Build,
+            u => {
+                return Err(serde::de::Error::unknown_variant(
+                    u,
+                    &["normal", "dev", "build"],
+                ));
+            }
+        })
+    }
+}
+
+impl Serialize for DependencyKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = match self {
+            Self::Normal => "normal",
+            Self::Dev => "dev",
+            Self::Build => "build",
+        };
+
+        serializer.serialize_str(s)
+    }
+}
+
 /// A whole crate with all its versions
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexKrate {
     /// All versions of the crate, sorted chronologically by when it was published
     pub versions: Vec<IndexVersion>,

@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use std::time::Duration;
-use tame_index::utils::flock::LockOptions;
+use tame_index::flock::LockOptions;
 
 enum LockKind {
     Exclusive,
@@ -163,10 +163,7 @@ fn wait_lock_times_out() {
             panic!("unexpected error type {err:#?}");
         };
 
-        assert!(matches!(
-            le.source,
-            tame_index::utils::flock::LockError::TimedOut
-        ));
+        assert!(matches!(le.source, tame_index::flock::LockError::TimedOut));
     } else {
         panic!("we should not be able to take the lock");
     }

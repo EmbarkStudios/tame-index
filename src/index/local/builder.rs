@@ -5,10 +5,9 @@ use crate::{Error, IndexKrate, PathBuf};
 use smol_str::SmolStr;
 
 /// An error that can occur when validating or creating a [`LocalRegistry`]
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum LocalRegistryError {
     /// A .crate file has a version that is not in the index
-    #[error("missing version {version} for crate {name}")]
     MissingVersion {
         /// The name of the crate
         name: String,
@@ -16,13 +15,31 @@ pub enum LocalRegistryError {
         version: SmolStr,
     },
     /// A .crate file's checksum did not match the checksum in the index for that version
-    #[error("checksum mismatch for {name}-{version}.crate")]
     ChecksumMismatch {
         /// The name of the crate
         name: String,
         /// The specific crate version
         version: SmolStr,
     },
+}
+
+impl std::fmt::Display for LocalRegistryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingVersion { name, version } => {
+                write!(f, "missing version {version} for crate {name}")
+            }
+            Self::ChecksumMismatch { name, version } => {
+                write!(f, "checksum mismatch for {name}-{version}.crate")
+            }
+        }
+    }
+}
+
+impl std::error::Error for LocalRegistryError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
 }
 
 /// Allows the building of a local registry

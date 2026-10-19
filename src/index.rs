@@ -13,21 +13,66 @@ pub use local::{LocalIndex, LocalRegistry};
 pub use location::{IndexLocation, IndexPath, IndexUrl};
 pub use sparse::SparseIndex;
 
-pub use crate::utils::flock::FileLock;
+pub use crate::flock::FileLock;
 
 /// Global configuration of an index, reflecting the [contents of config.json](https://doc.rust-lang.org/cargo/reference/registries.html#index-format).
-#[derive(Eq, PartialEq, PartialOrd, Ord, Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Clone, Debug)]
 pub struct IndexConfig {
     /// Pattern for creating download URLs. See [`Self::download_url`].
     pub dl: String,
-    #[serde(default)]
     /// Base URL for publishing, etc.
     pub api: Option<String>,
     /// Indicates whether this is a private registry that requires all
     /// operations to be authenticated including API requests, crate downloads
     /// and sparse index updates.
-    #[serde(default, rename = "auth-required")]
     pub auth_required: bool,
+}
+
+impl<'de> serde::Deserialize<'de> for IndexConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct V;
+
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = IndexConfig;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("index configuration")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut dl = None;
+                let mut api = None;
+                let mut auth_required = None;
+
+                while let Some(k) = map.next_key::<std::borrow::Cow<'_, str>>()? {
+                    match k.as_ref() {
+                        "dl" => dl = Some(map.next_value()?),
+                        "api" => api = Some(map.next_value()?),
+                        "auth-required" => auth_required = Some(map.next_value()?),
+                        _ => {
+                            // We could error here, but _probably_ nicer to just ignore new/invalid fields to avoid
+                            // _probably_ inconsequential future changes (at least when they immediately come out)
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(IndexConfig {
+                    dl: dl.ok_or_else(|| serde::de::Error::missing_field("dl"))?,
+                    api,
+                    auth_required: auth_required.unwrap_or_default(),
+                })
+            }
+        }
+
+        deserializer.deserialize_any(V)
+    }
 }
 
 impl IndexConfig {
@@ -195,7 +240,7 @@ pub struct JsonLines<'r>(&'r [u8]);
 impl<'r> JsonLines<'r> {
     /// Performs basic validation that this is a sequence of one or more JSON objects separated by newlines
     #[inline]
-    pub fn validate(mut re: &'r [u8]) -> Result<Self, crate::error::InvalidRemoteEntry> {
+    pub fn validate(mut re: &'r [u8]) -> Result<Self, crate::error::InvalidJsonLines> {
         let mut line = 0;
 
         // there should only be one trailing newline from a valid response, remove all of them though so we don't need
@@ -206,7 +251,7 @@ impl<'r> JsonLines<'r> {
 
         for item in crate::utils::split(re, b'\n') {
             if item.len() < 2 || item[0] != b'{' || item[item.len() - 1] != b'}' {
-                return Err(crate::error::InvalidRemoteEntry::NotJson(line));
+                return Err(crate::error::InvalidJsonLines::NotJson(line));
             }
 
             line += 1;
@@ -215,7 +260,7 @@ impl<'r> JsonLines<'r> {
         if line != 0 {
             Ok(Self(re))
         } else {
-            Err(crate::error::InvalidRemoteEntry::Empty)
+            Err(crate::error::InvalidJsonLines::Empty)
         }
     }
 }

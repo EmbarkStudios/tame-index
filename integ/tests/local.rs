@@ -219,7 +219,7 @@ local-registry = "test-local-registry"
     assert!(matches!(url, tame_index::IndexUrl::Local(_)));
     let index =
         tame_index::index::ComboIndexCache::new(tame_index::IndexLocation::new(url)).unwrap();
-    let lock = tame_index::utils::flock::FileLock::unlocked();
+    let lock = tame_index::flock::FileLock::unlocked();
     let krate = index
         .cached_krate(integ::kn!("example-dependency"), &lock)
         .unwrap()
