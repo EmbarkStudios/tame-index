@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) added `index::IndexEntry`. It can be deserialized into `IndexKrate` via `deserialize`, but also has `iter` which gives an iterator over `IndexEntryVersion`, which has its own `deserialize` giving an `IndexVersion`, as well as a `yanked` method that gives just the version string and `yanked` status, as well as `raw` which gives the version string and the full JSON slice allowing a user to do their own deserialization of only the data they need.
+- [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) added `cache::Revision` which is the revision of the entry, either a `git::GitRevision`, `sparse::HttpRevision` or `Unknown`.
+- [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) added `LocalIndex` and now uses it for the `ComboIndexCache::Local` variant instead of `LocalRegistry`. This is a more flexible implementation that only serves index functionality, and can be created either from a index root such as a mirrored remote index, or detects if there is an `index` subdirectory of a `LocalRegistry`.
+- [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) added `KrateName::from_static`.
+
+### Removed
+- [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) removed the `sparse` feature completely. The feature was somewhat in conflict with the idea of this crate being sans-io (barring disk I/O), as well as making configuration annoying due to how TLS and certificate roots are done in `reqwest`.
+- [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) removed the `local` feature, as opening a `LocalRegistry` or `LocalIndex` is now available without a feature flag, but validation and/or building of a `LocalRegistry` is still gated behind `local-builder`.
+- [PR#117](https://github.com/EmbarkStudios/tame-index/pull/117) removed the dependency on `twox-hash` in favor of an inline fnv hash.
+- [PR#117](https://github.com/EmbarkStudios/tame-index/pull/117) removed `serde_derive` and `thiserror` in favor of manual implemntations.
+
+### Changed
+- [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) `IndexKrate` is no longer returned when requesting index entries, but rather `IndexEntry`.
+
 ## [0.26.3] - 2026-04-27
 ### Changed
 - [PR#111](https://github.com/EmbarkStudios/tame-index/pull/111) removed the dependency on `home`.
