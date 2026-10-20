@@ -18,21 +18,7 @@
 [![Build status](https://github.com/EmbarkStudios/tame-index/workflows/CI/badge.svg)](https://github.com/EmbarkStudios/tame-index/actions)
 </div>
 
-## Differences from [`crates-index`][0]
-
-1. `tame-index` as of version 0.26.0 **no longer supports fetching or accessing git registry repositories**.
-1. The API exposes enough pieces where an alternative git implementation can be used if `gix` is not to your liking.
-1. Sparse index support via [`reqwest`](https://crates.io/crates/reqwest) is optional, gated behind the `sparse` feature flag.
-1. Local cache files are always supported regardless of features enabled
-1. `ComboIndexCache` (local cache files only) and `ComboIndex` (cache + remote capabilities) are provided to wrap git indices, sparse indices, or local registries depending on the the index URL.
-1. Functionality for writing cache entries to the local index cache is exposed in the public API
-1. [`Local Registry`](https://doc.rust-lang.org/cargo/reference/source-replacement.html#local-registry-sources) support is available behind the `local` feature flag
-1. Building of local registries is available behind the `local-builder` feature flag
-1. File-based locking compatible with Cargo is available to ensure `tame-index` and Cargo can play nicely together.
-
-## `sparse` feature
-
-Enabling the `sparse` feature gives built-in support for fetching from HTTP sparse indices via `reqwest`. `tame-index` does not take a stance on TLS, thus it is the responsibility of the user to properly configure the client that they pass to `tame-index`. See `examples/tls.rs` for an example of how one can configure a Client using `rustls`, `ring`, and `webpki-roots`.
+This is a crate for interacting with [cargo registry indices](https://doc.rust-lang.org/nightly/cargo/reference/registry-index.html) with a sans-io approach. If you wish for built-in `git` and/or `sparse` support with the I/O done for you you can check out [`crates-index`][0].
 
 ## Contributing
 
