@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.27.0] - 2026-10-20
 ### Added
 - [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) added `index::IndexEntry`. It can be deserialized into `IndexKrate` via `deserialize`, but also has `iter` which gives an iterator over `IndexEntryVersion`, which has its own `deserialize` giving an `IndexVersion`, as well as a `yanked` method that gives just the version string and `yanked` status, as well as `raw` which gives the version string and the full JSON slice allowing a user to do their own deserialization of only the data they need.
 - [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) added `cache::Revision` which is the revision of the entry, either a `git::GitRevision`, `sparse::HttpRevision` or `Unknown`.
@@ -328,7 +329,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.26.3...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.27.0...HEAD
+[0.27.0]: https://github.com/EmbarkStudios/tame-index/compare/0.26.3...0.27.0
 [0.26.3]: https://github.com/EmbarkStudios/tame-index/compare/0.26.2...0.26.3
 [0.26.2]: https://github.com/EmbarkStudios/tame-index/compare/0.26.1...0.26.2
 [0.26.1]: https://github.com/EmbarkStudios/tame-index/compare/0.26.0...0.26.1
