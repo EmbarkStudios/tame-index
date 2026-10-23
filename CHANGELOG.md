@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.27.1] - 2026-10-23
 ### Fixed
 - [PR#120](https://github.com/EmbarkStudios/tame-index/pull/120) resolved [#119](https://github.com/EmbarkStudios/tame-index/issues/119) by fixing the definition of `IndexDependency::kind`. In cargo metadata a `normal` kind will be serialized as `null`, but in the index `kind` is always present and always a string.
 
@@ -332,7 +333,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.27.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.27.1...HEAD
+[0.27.1]: https://github.com/EmbarkStudios/tame-index/compare/0.27.0...0.27.1
 [0.27.0]: https://github.com/EmbarkStudios/tame-index/compare/0.26.3...0.27.0
 [0.26.3]: https://github.com/EmbarkStudios/tame-index/compare/0.26.2...0.26.3
 [0.26.2]: https://github.com/EmbarkStudios/tame-index/compare/0.26.1...0.26.2
