@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#120](https://github.com/EmbarkStudios/tame-index/pull/120) resolved [#119](https://github.com/EmbarkStudios/tame-index/issues/119) by fixing the definition of `IndexDependency::kind`. In cargo metadata a `normal` kind will be serialized as `null`, but in the index `kind` is always present and always a string.
+
 ## [0.27.0] - 2026-10-20
 ### Added
 - [PR#116](https://github.com/EmbarkStudios/tame-index/pull/116) added `index::IndexEntry`. It can be deserialized into `IndexKrate` via `deserialize`, but also has `iter` which gives an iterator over `IndexEntryVersion`, which has its own `deserialize` giving an `IndexVersion`, as well as a `yanked` method that gives just the version string and `yanked` status, as well as `raw` which gives the version string and the full JSON slice allowing a user to do their own deserialization of only the data they need.
