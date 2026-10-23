@@ -140,9 +140,75 @@ fn serializes_current_cargo_cache() {
     ours.clear();
     {
         let ik = cargos.deserialize().unwrap();
-        CacheWrite::Krate(&ik)
+        CacheWrite::from(&ik)
             .write_cache_entry(&mut ours, &cargo_ce.revision)
             .unwrap();
         check(&ours);
+    }
+}
+
+#[test]
+#[ignore = "deserializes every cache entry on the local system"]
+fn deserialize_all() {
+    let (root, _) = tame_index::IndexLocation::new(tame_index::IndexUrl::CratesIoSparse)
+        .into_parts()
+        .unwrap();
+    let cio = tame_index::SparseIndex::new(tame_index::IndexLocation::new(
+        tame_index::IndexUrl::CratesIoSparse,
+    ))
+    .unwrap();
+
+    struct Context {
+        index: tame_index::SparseIndex,
+        total: usize,
+        failed: std::collections::BTreeMap<String, String>,
+    }
+
+    fn walk_dir(path: &tame_index::Path, ctx: &mut Context) {
+        let l = tame_index::flock::FileLock::unlocked();
+        for entry in std::fs::read_dir(path).unwrap() {
+            let entry = entry.unwrap();
+            let path = tame_index::PathBuf::from_path_buf(entry.path()).unwrap();
+            let ft = entry.file_type().unwrap();
+
+            if ft.is_dir() {
+                walk_dir(&path, ctx);
+            } else if ft.is_file() {
+                let fname = path.file_name().unwrap().to_owned();
+
+                if fname.contains(".") {
+                    continue;
+                }
+
+                ctx.total += 1;
+
+                let kn = fname.as_str().try_into().unwrap();
+                match ctx.index.cache().read_cache_file(kn, &l) {
+                    Ok(Some(e)) => {
+                        if let Err(err) = e.deserialize() {
+                            ctx.failed.insert(fname, err.to_string());
+                        }
+                    }
+                    Ok(None) => {
+                        ctx.failed.insert(fname, "not found".into());
+                    }
+                    Err(err) => {
+                        ctx.failed.insert(fname, err.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    let mut ctx = Context {
+        index: cio,
+        total: 0,
+        failed: Default::default(),
+    };
+
+    walk_dir(&root, &mut ctx);
+
+    if !ctx.failed.is_empty() {
+        panic!("{:#?}", ctx.failed);
     }
 }
