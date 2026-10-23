@@ -282,7 +282,7 @@ pub struct IndexDependency {
     /// Cfg expression applied to the dependency
     pub target: Option<Box<SmolStr>>,
     /// The kind of the dependency
-    pub kind: Option<DependencyKind>,
+    pub kind: DependencyKind,
     /// The name of the actual crate, if it was renamed in the crate's manifest
     pub package: Option<Box<SmolStr>>,
 }
@@ -376,9 +376,7 @@ impl Serialize for IndexDependency {
         m.serialize_entry("optional", &self.optional)?;
         m.serialize_entry("default_features", &self.default_features)?;
         m.serialize_entry("target", &self.target)?;
-        if let Some(k) = &self.kind {
-            m.serialize_entry("kind", k)?;
-        }
+        m.serialize_entry("kind", &self.kind)?;
         if let Some(p) = &self.package {
             m.serialize_entry("package", p)?;
         }
@@ -424,7 +422,7 @@ impl IndexDependency {
     /// The kind of the dependency
     #[inline]
     pub fn kind(&self) -> DependencyKind {
-        self.kind.unwrap_or_default()
+        self.kind
     }
 
     /// Set if dependency's crate name is different from the `name` (alias)
