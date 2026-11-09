@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#121](https://github.com/EmbarkStudios/tame-index/pull/121) now allows `"package":null` for compatibility with non-crates.io indices that may emit it.
+
 ## [0.27.1] - 2026-10-23
 ### Fixed
 - [PR#120](https://github.com/EmbarkStudios/tame-index/pull/120) resolved [#119](https://github.com/EmbarkStudios/tame-index/issues/119) by fixing the definition of `IndexDependency::kind`. In cargo metadata a `normal` kind will be serialized as `null`, but in the index `kind` is always present and always a string.
