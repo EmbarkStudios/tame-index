@@ -338,7 +338,7 @@ impl<'de> Deserialize<'de> for IndexDependency {
                             kind = Some(map.next_value()?);
                         }
                         "package" => {
-                            package = Some(map.next_value()?);
+                            package = map.next_value()?;
                         }
                         _ => {
                             map.next_value::<serde::de::IgnoredAny>()?;
