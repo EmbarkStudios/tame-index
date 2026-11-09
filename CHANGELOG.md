@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.27.2] - 2026-11-09
 ### Fixed
 - [PR#121](https://github.com/EmbarkStudios/tame-index/pull/121) now allows `"package":null` for compatibility with non-crates.io indices that may emit it.
 
@@ -336,7 +337,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial crate squat
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.27.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/tame-index/compare/0.27.2...HEAD
+[0.27.2]: https://github.com/EmbarkStudios/tame-index/compare/0.27.1...0.27.2
 [0.27.1]: https://github.com/EmbarkStudios/tame-index/compare/0.27.0...0.27.1
 [0.27.0]: https://github.com/EmbarkStudios/tame-index/compare/0.26.3...0.27.0
 [0.26.3]: https://github.com/EmbarkStudios/tame-index/compare/0.26.2...0.26.3
