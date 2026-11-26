@@ -221,9 +221,10 @@ pub fn url_to_local_dir(url: &str, stable: bool) -> Result<UrlDir, Error> {
                 None => &url[scheme_ind..],
             };
 
-            // trim port
-            let host = host.split(':').next().unwrap();
-            host.split_once('@').map_or(host, |(_user, host)| host)
+            // Remove user
+            let host = host.split_once('@').map_or(host, |(_user, host)| host);
+            // Remove port
+            host.split_once(':').map_or(host, |(host, _port)| host)
         };
 
         (format!("{dir_name}-{ident}"), canonical)
@@ -244,9 +245,10 @@ pub fn url_to_local_dir(url: &str, stable: bool) -> Result<UrlDir, Error> {
             None => &url[scheme_ind..],
         };
 
-        // trim port
-        let host = host.split(':').next().unwrap();
+        // Remove user
         let host = host.split_once('@').map_or(host, |(_user, host)| host);
+        // Remove port
+        let host = host.split_once(':').map_or(host, |(host, _port)| host);
 
         (format!("{host}-{ident}"), url.to_owned())
     };
@@ -424,6 +426,18 @@ mod test {
             (
                 "registry/index/cargo.cloudsmith.io-2fc1f5411e6e72fd".into(),
                 "sparse+https://cargo.cloudsmith.io/embark/deny".to_owned(),
+            )
+        );
+        assert_eq!(
+            get_index_details(
+                "sparse+http://ci-user:secret-token@127.0.0.1:18765/index/",
+                Some(PathBuf::new()),
+                true
+            )
+            .unwrap(),
+            (
+                "registry/index/127.0.0.1-9cb62abdc6b92eb7".into(),
+                "sparse+http://ci-user:secret-token@127.0.0.1:18765/index".to_owned(),
             )
         );
     }
