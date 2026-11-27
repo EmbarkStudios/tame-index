@@ -1,3 +1,5 @@
+use smol_str::StrExt;
+
 use crate::error::{Error, InvalidKrateName};
 
 // This is a single table, binary sorted so that we can more easily just
@@ -14,22 +16,11 @@ const DISALLOWED: &[(&str, crate::error::ReservedNameKind)] = &[
     ("alloc", Standard),
     ("as", Keyword),
     ("async", Keyword),
-    ("aux", Windows),
     ("await", Keyword),
     ("become", Keyword),
     ("box", Keyword),
     ("break", Keyword),
     ("build", Artifact),
-    ("com1", Windows),
-    ("com2", Windows),
-    ("com3", Windows),
-    ("com4", Windows),
-    ("com5", Windows),
-    ("com6", Windows),
-    ("com7", Windows),
-    ("com8", Windows),
-    ("com9", Windows),
-    ("con", Windows),
     ("const", Keyword),
     ("continue", Keyword),
     ("core", Standard),
@@ -51,24 +42,13 @@ const DISALLOWED: &[(&str, crate::error::ReservedNameKind)] = &[
     ("incremental", Artifact),
     ("let", Keyword),
     ("loop", Keyword),
-    ("lpt1", Windows),
-    ("lpt2", Windows),
-    ("lpt3", Windows),
-    ("lpt4", Windows),
-    ("lpt5", Windows),
-    ("lpt6", Windows),
-    ("lpt7", Windows),
-    ("lpt8", Windows),
-    ("lpt9", Windows),
     ("macro", Keyword),
     ("match", Keyword),
     ("mod", Keyword),
     ("move", Keyword),
     ("mut", Keyword),
-    ("nul", Windows),
     ("override", Keyword),
     ("priv", Keyword),
-    ("prn", Windows),
     ("proc-macro", Standard),
     ("proc_macro", Standard),
     ("pub", Keyword),
@@ -92,6 +72,10 @@ const DISALLOWED: &[(&str, crate::error::ReservedNameKind)] = &[
     ("where", Keyword),
     ("while", Keyword),
     ("yield", Keyword),
+];
+const WINDOWS: &[&str] = &[
+    "aux", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "con", "lpt1",
+    "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9", "nul", "prn",
 ];
 
 /// Used to wrap user-provided strings so that bad crate names are required to
@@ -163,6 +147,29 @@ impl<'name> KrateName<'name> {
             i += 1;
         }
 
+        i = 0;
+        while i < WINDOWS.len() {
+            let dis = WINDOWS[i].as_bytes();
+            if dis.len() == b.len() {
+                let mut j = 0;
+
+                let same = loop {
+                    if j == b.len() {
+                        break true;
+                    }
+
+                    if dis[j] != b[j].to_ascii_lowercase() {
+                        break false;
+                    }
+
+                    j += 1;
+                };
+
+                assert!(!same, "name is reserved");
+            }
+            i += 1;
+        }
+
         Self(name)
     }
 
@@ -213,6 +220,15 @@ impl<'name> KrateName<'name> {
         if let Ok(i) = DISALLOWED.binary_search_by_key(&name, |(k, _v)| k) {
             let (reserved, kind) = DISALLOWED[i];
             Err(InvalidKrateName::ReservedName { reserved, kind }.into())
+        } else if matches!(name.len(), 3 | 4)
+            && let lower = name.to_ascii_lowercase_smolstr()
+            && let Ok(i) = WINDOWS.binary_search(&lower.as_str())
+        {
+            Err(InvalidKrateName::ReservedName {
+                reserved: WINDOWS[i],
+                kind: Windows,
+            }
+            .into())
         } else {
             Ok(Self(name))
         }
@@ -384,6 +400,20 @@ mod test {
             KrateName::cargo("nul").unwrap_err(),
             Error::InvalidKrateName(InvalidKrateName::ReservedName {
                 reserved: "nul",
+                kind: ReservedNameKind::Windows
+            })
+        ));
+        assert!(matches!(
+            KrateName::cargo("NUL").unwrap_err(),
+            Error::InvalidKrateName(InvalidKrateName::ReservedName {
+                reserved: "nul",
+                kind: ReservedNameKind::Windows
+            })
+        ));
+        assert!(matches!(
+            KrateName::cargo("Lpt5").unwrap_err(),
+            Error::InvalidKrateName(InvalidKrateName::ReservedName {
+                reserved: "lpt5",
                 kind: ReservedNameKind::Windows
             })
         ));
