@@ -81,7 +81,7 @@ impl<'buffer> ValidCacheEntry<'buffer> {
                 .and_then(|b| b.try_into().map_err(|_e| CacheError::InvalidCacheEntry))?,
         );
 
-        if INDEX_V_MAX > index_version {
+        if index_version > INDEX_V_MAX {
             return Err(CacheError::UnknownIndexVersion);
         }
 
