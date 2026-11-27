@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#126](https://github.com/EmbarkStudios/tame-index/pull/126) resolved [#122](https://github.com/EmbarkStudios/tame-index/issues/122) by correcting handling urls with a user.
+- [PR#127](https://github.com/EmbarkStudios/tame-index/pull/127) resolved [#124](https://github.com/EmbarkStudios/tame-index/issues/124) by correcting the index version check. If cargo updated the version in the future a panic would likely have occurred attempting to parse the new format thinking it was the current one.
+- [PR#127](https://github.com/EmbarkStudios/tame-index/pull/127) resolved [#124](https://github.com/EmbarkStudios/tame-index/issues/125) by case-insensitively checking the invalid crate names due to Windows.
+
+### Removed
+- [PR#128](https://github.com/EmbarkStudios/tame-index/pull/128) removed `IndexDependencyVersion::version_requirement`, as there are packages in the index with invalid semver requirements that cargo itself will fail on, and it only wrapped `semver::VersionReq::from_str` which can easily be done by a downstream user to decide how they want to handle parse errors instead.
+
 ## [0.27.2] - 2026-11-09
 ### Fixed
 - [PR#121](https://github.com/EmbarkStudios/tame-index/pull/121) now allows `"package":null` for compatibility with non-crates.io indices that may emit it.
