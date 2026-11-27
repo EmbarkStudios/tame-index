@@ -387,9 +387,14 @@ impl Serialize for IndexDependency {
 
 impl IndexDependency {
     /// Gets the version requirement for the dependency as a [`semver::VersionReq`]
+    ///
+    /// # Notes
+    ///
+    /// There are an _extremely_ small number of versions in the index that are actually invalid and won't even be
+    /// loaded by cargo (with an "index entry is invalid" error when trying to add the crate using a bad version)
     #[inline]
-    pub fn version_requirement(&self) -> semver::VersionReq {
-        self.req.parse().unwrap()
+    pub fn version_requirement(&self) -> Result<semver::VersionReq, semver::Error> {
+        self.req.parse()
     }
 
     /// Features unconditionally enabled when using this dependency, in addition
